@@ -1,0 +1,208 @@
+# Weapon Upgrade System Implementation Plan
+
+## 1. Weapon Upgrade Data
+```gdscript
+# /src/resources/weapons/weapon_upgrade_data.gd
+class_name WeaponUpgradeData
+extends Resource
+
+@export_group("Basic Info")
+@export var id: String = ""
+@export var name: String = ""
+@export var description: String = ""
+@export var icon: Texture2D
+@export var tier: int = 1
+
+@export_group("Upgrade Effects")
+@export var stat_modifiers: Dictionary = {
+    "damage": 0.0,
+    "fire_rate": 0.0,
+    "projectile_speed": 0.0,
+    "area": 0.0
+}
+
+@export_group("Requirements")
+@export var required_level: int = 1
+@export var required_upgrades: Array[String] = []
+@export var cost: int = 100
+
+func can_apply_to(weapon: WeaponBase) -> bool:
+    if weapon.level < required_level:
+        return false
+        
+    for req in required_upgrades:
+        if not weapon.has_upgrade(req):
+            return false
+            
+    return true
+```
+
+## 2. Upgrade Manager
+```gdscript
+# /src/scripts/weapons/upgrade_manager.gd
+class_name WeaponUpgradeManager
+extends Node
+
+signal upgrade_available(weapon: WeaponBase, upgrades: Array)
+signal upgrade_applied(weapon: WeaponBase, upgrade: WeaponUpgradeData)
+
+@export var upgrades_per_choice: int = 3
+@export var max_upgrade_tier: int = 3
+
+var available_upgrades: Dictionary = {}  # id: WeaponUpgradeData
+var upgrade_pools: Dictionary = {}       # tier: Array[WeaponUpgradeData]
+
+func _ready() -> void:
+    _load_upgrades()
+    _initialize_pools()
+
+func get_available_upgrades(weapon: WeaponBase) -> Array[WeaponUpgradeData]:
+    var valid_upgrades: Array[WeaponUpgradeData] = []
+    var current_tier = min(weapon.level / 3, max_upgrade_tier)
+    
+    # Get upgrades from current and previous tiers
+    for tier in range(current_tier + 1):
+        if upgrade_pools.has(tier):
+            for upgrade in upgrade_pools[tier]:
+                if upgrade.can_apply_to(weapon):
+                    valid_upgrades.append(upgrade)
+    
+    # Randomize and return subset
+    valid_upgrades.shuffle()
+    return valid_upgrades.slice(0, min(upgrades_per_choice - 1, valid_upgrades.size()))
+```
+
+## 3. Weapon Upgrade Component
+```gdscript
+# /src/scripts/weapons/components/weapon_upgrade_component.gd
+class_name WeaponUpgradeComponent
+extends Node
+
+signal stats_updated(stats: Dictionary)
+signal upgrade_added(upgrade: WeaponUpgradeData)
+
+var active_upgrades: Dictionary = {}  # id: WeaponUpgradeData
+var stat_modifiers: Dictionary = {
+    "damage": 1.0,
+    "fire_rate": 1.0,
+    "projectile_speed": 1.0,
+    "area": 1.0
+}
+
+func apply_upgrade(upgrade: WeaponUpgradeData) -> void:
+    if active_upgrades.has(upgrade.id):
+        return
+        
+    active_upgrades[upgrade.id] = upgrade
+    _apply_stat_modifiers(upgrade.stat_modifiers)
+    upgrade_added.emit(upgrade)
+
+func _apply_stat_modifiers(modifiers: Dictionary) -> void:
+    for stat in modifiers:
+        if stat_modifiers.has(stat):
+            stat_modifiers[stat] += modifiers[stat]
+    
+    stats_updated.emit(stat_modifiers)
+```
+
+## 4. Upgrade UI System
+```gdscript
+# /src/scripts/ui/weapon_upgrade_ui.gd
+class_name WeaponUpgradeUI
+extends Control
+
+signal upgrade_selected(upgrade: WeaponUpgradeData)
+
+@export var upgrade_card_scene: PackedScene
+@export var stat_comparison_scene: PackedScene
+@onready var upgrade_container: Container = $UpgradeContainer
+@onready var comparison_panel: Control = $ComparisonPanel
+
+func show_upgrades(weapon: WeaponBase, upgrades: Array[WeaponUpgradeData]) -> void:
+    clear_upgrades()
+    
+    for upgrade in upgrades:
+        var card = upgrade_card_scene.instantiate()
+        upgrade_container.add_child(card)
+        card.setup(upgrade)
+        card.selected.connect(
+            func(): _on_upgrade_selected(upgrade)
+        )
+        card.mouse_entered.connect(
+            func(): _show_comparison(weapon, upgrade)
+        )
+
+func _show_comparison(weapon: WeaponBase, upgrade: WeaponUpgradeData) -> void:
+    var current_stats = weapon.get_current_stats()
+    var projected_stats = weapon.get_projected_stats(upgrade)
+    
+    comparison_panel.show_comparison(
+        current_stats,
+        projected_stats
+    )
+```
+
+## 5. Upgrade Effects System
+```gdscript
+# /src/scripts/weapons/upgrade_effects_system.gd
+class_name UpgradeEffectsSystem
+extends Node
+
+var effect_pools: Dictionary = {}  # effect_type: ObjectPool
+var active_effects: Dictionary = {}  # weapon: Array[Effect]
+
+func _ready() -> void:
+    _initialize_effect_pools()
+
+func apply_upgrade_effects(weapon: WeaponBase, upgrade: WeaponUpgradeData) -> void:
+    if not active_effects.has(weapon):
+        active_effects[weapon] = []
+    
+    var effect = _create_upgrade_effect(upgrade)
+    if effect:
+        effect.apply_to(weapon)
+        active_effects[weapon].append(effect)
+
+func _create_upgrade_effect(upgrade: WeaponUpgradeData) -> Node:
+    var effect_type = upgrade.get_effect_type()
+    if not effect_pools.has(effect_type):
+        return null
+        
+    return effect_pools[effect_type].get_object()
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/weapon_upgrade_test.tscn
+- Node2D (root)
+  - WeaponManager
+  - UpgradeManager
+  - TestWeapons
+    - UpgradeableWeapon
+  - TestTargets
+  - PerformanceMonitor
+  - TestUI
+    - UpgradeMenu
+    - StatComparison
+    - EffectPreview
+```
+
+2. Test scenarios:
+- Upgrade application
+- Stat modifications
+- Visual effects
+- UI responsiveness
+- Performance impact
+- Memory management
+- Upgrade combinations
+
+## Next Steps
+
+1. Add enemy attack patterns
+2. Develop boss combat mechanics
+3. Implement weapon synergies
+4. Create special effects system
+
+Would you like me to continue with any of these next steps? 

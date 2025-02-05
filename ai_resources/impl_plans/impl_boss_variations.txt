@@ -1,0 +1,179 @@
+# Boss Variations Implementation Plan
+
+## 1. Boss Variant Data
+```gdscript
+# /src/resources/bosses/boss_variant_data.gd
+class_name BossVariantData
+extends Resource
+
+@export_group("Variant Info")
+@export var id: String = ""
+@export var base_boss_id: String = ""
+@export var variant_name: String = ""
+@export var difficulty_modifier: float = 1.0
+
+@export_group("Unique Features")
+@export var special_abilities: Array[AbilityData] = []
+@export var unique_patterns: Array[AttackPatternData] = []
+@export var phase_modifiers: Dictionary = {}
+
+@export_group("Performance Settings")
+@export var max_special_effects: int = 15  # Performance limit
+@export var max_minions: int = 8  # Limit for performance
+```
+
+## 2. Boss Variant Manager
+```gdscript
+# /src/scripts/bosses/boss_variant_manager.gd
+class_name BossVariantManager
+extends Node
+
+signal variant_spawned(variant_id: String)
+signal special_ability_unlocked(ability: AbilityData)
+
+var active_variants: Dictionary = {}  # boss_id: BossVariantData
+var ability_pools: Dictionary = {}    # ability_id: ObjectPool
+
+func _ready() -> void:
+    _initialize_pools()
+    _load_variants()
+
+func spawn_variant(base_boss: BossBase, variant_id: String) -> void:
+    var variant_data = _get_variant_data(variant_id)
+    if not variant_data:
+        return
+        
+    _apply_variant_modifications(base_boss, variant_data)
+    _setup_special_abilities(base_boss, variant_data)
+    _modify_attack_patterns(base_boss, variant_data)
+    
+    active_variants[base_boss.get_instance_id()] = variant_data
+    variant_spawned.emit(variant_id)
+```
+
+## 3. Special Ability System
+```gdscript
+# /src/scripts/bosses/special_ability_system.gd
+class_name BossSpecialAbilitySystem
+extends Node
+
+@export var ability_cooldown_multiplier: float = 1.0
+@export var max_active_abilities: int = 3  # Performance limit
+
+var active_abilities: Dictionary = {}  # ability_id: AbilityInstance
+var cooldown_timers: Dictionary = {}   # ability_id: Timer
+
+func activate_ability(ability: AbilityData) -> void:
+    if active_abilities.size() >= max_active_abilities:
+        return
+        
+    var instance = _create_ability_instance(ability)
+    if instance:
+        active_abilities[ability.id] = instance
+        instance.activated.connect(_on_ability_activated.bind(ability.id))
+        instance.completed.connect(_on_ability_completed.bind(ability.id))
+        instance.activate()
+
+func _create_ability_instance(ability: AbilityData) -> Node:
+    var pool = ability_pools.get(ability.type)
+    if not pool:
+        return null
+        
+    return pool.get_object()
+```
+
+## 4. Phase Modifier System
+```gdscript
+# /src/scripts/bosses/phase_modifier_system.gd
+class_name BossPhaseModifierSystem
+extends Node
+
+signal modifier_applied(phase_id: String, modifier: Dictionary)
+
+var active_modifiers: Dictionary = {}  # phase_id: Array[Dictionary]
+var base_stats: Dictionary = {}
+
+func apply_phase_modifiers(phase: BossPhase, modifiers: Dictionary) -> void:
+    if not base_stats.has(phase.id):
+        base_stats[phase.id] = _capture_base_stats(phase)
+    
+    var phase_mods = []
+    for mod_type in modifiers:
+        var modifier = _create_modifier(mod_type, modifiers[mod_type])
+        _apply_modifier(phase, modifier)
+        phase_mods.append(modifier)
+    
+    active_modifiers[phase.id] = phase_mods
+    modifier_applied.emit(phase.id, modifiers)
+
+func _apply_modifier(phase: BossPhase, modifier: Dictionary) -> void:
+    match modifier.type:
+        "stat":
+            _apply_stat_modifier(phase, modifier)
+        "pattern":
+            _apply_pattern_modifier(phase, modifier)
+        "ability":
+            _apply_ability_modifier(phase, modifier)
+```
+
+## 5. Variant Attack Patterns
+```gdscript
+# /src/scripts/bosses/variant_attack_patterns.gd
+class_name BossVariantAttackPatterns
+extends Node
+
+@export var pattern_blend_time: float = 0.5
+@export var max_pattern_complexity: int = 5  # Performance consideration
+
+var base_patterns: Dictionary = {}
+var variant_patterns: Dictionary = {}
+
+func initialize_variant_patterns(base_boss: BossBase, variant_data: BossVariantData) -> void:
+    _store_base_patterns(base_boss)
+    _create_variant_patterns(variant_data)
+    _blend_patterns()
+
+func _create_variant_patterns(variant_data: BossVariantData) -> void:
+    for pattern in variant_data.unique_patterns:
+        var modified_pattern = _modify_base_pattern(
+            base_patterns[pattern.base_id],
+            pattern.modifications
+        )
+        variant_patterns[pattern.id] = modified_pattern
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/boss_variant_test.tscn
+- Node2D (root)
+  - BossSpawner
+    - BaseBoss
+    - VariantBoss
+  - AbilitySystem
+  - PatternManager
+  - PerformanceMonitor
+  - TestUI
+    - VariantInfo
+    - AbilityDisplay
+    - PhaseIndicator
+```
+
+2. Test scenarios:
+- Variant spawning
+- Special abilities
+- Modified patterns
+- Phase transitions
+- Performance impact
+- Visual distinction
+- Difficulty scaling
+
+## Next Steps
+
+1. Complete progression systems
+2. Implement meta progression
+3. Add achievement system
+4. Create save/load system
+
+Would you like me to continue with the progression systems next? 

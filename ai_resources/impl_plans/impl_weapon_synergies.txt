@@ -1,0 +1,190 @@
+# Weapon Synergy System Implementation Plan
+
+## 1. Synergy Data Resource
+```gdscript
+# /src/resources/weapons/synergy_data.gd
+class_name SynergyData
+extends Resource
+
+@export_group("Basic Info")
+@export var id: String = ""
+@export var name: String = ""
+@export var description: String = ""
+@export var icon: Texture2D
+@export var tier: int = 1
+
+@export_group("Requirements")
+@export var required_weapons: Array[String] = []
+@export var required_upgrades: Array[String] = []
+@export var min_weapon_level: int = 1
+
+@export_group("Performance Settings")
+@export var max_effects: int = 5  # Limit visual effects
+@export var update_frequency: int = 2  # Performance optimization
+```
+
+## 2. Synergy Manager
+```gdscript
+# /src/scripts/weapons/synergy_manager.gd
+class_name SynergyManager
+extends Node
+
+signal synergy_activated(synergy: SynergyData)
+signal synergy_deactivated(synergy: SynergyData)
+
+var active_synergies: Dictionary = {}  # id: SynergyEffect
+var weapon_manager: WeaponManager
+var effect_pool: ObjectPool
+
+func _ready() -> void:
+    weapon_manager = get_node("/root/WeaponManager")
+    _initialize_effect_pool()
+    _connect_signals()
+
+func _physics_process(_delta: float) -> void:
+    if Engine.get_frames_drawn() % update_frequency != 0:
+        return
+    
+    _check_synergies()
+
+func _check_synergies() -> void:
+    var weapons = weapon_manager.get_active_weapons()
+    for synergy in SynergyDatabase.get_all():
+        var should_be_active = _check_synergy_requirements(synergy, weapons)
+        
+        if should_be_active and not active_synergies.has(synergy.id):
+            _activate_synergy(synergy)
+        elif not should_be_active and active_synergies.has(synergy.id):
+            _deactivate_synergy(synergy)
+```
+
+## 3. Synergy Effect System
+```gdscript
+# /src/scripts/weapons/synergy_effect.gd
+class_name SynergyEffect
+extends Node
+
+@export var effect_data: SynergyData
+@export var visual_effect: GPUParticles2D
+@export var sound_effect: AudioStreamPlayer
+
+var affected_weapons: Array[WeaponBase] = []
+var is_active: bool = false
+
+func activate(weapons: Array[WeaponBase]) -> void:
+    if is_active:
+        return
+    
+    is_active = true
+    affected_weapons = weapons
+    
+    for weapon in weapons:
+        _apply_weapon_modifications(weapon)
+    
+    if visual_effect:
+        visual_effect.emitting = true
+    if sound_effect:
+        sound_effect.play()
+
+func _apply_weapon_modifications(weapon: WeaponBase) -> void:
+    match effect_data.modification_type:
+        "stat_boost":
+            _apply_stat_boost(weapon)
+        "special_effect":
+            _apply_special_effect(weapon)
+        "projectile_modifier":
+            _apply_projectile_modifier(weapon)
+```
+
+## 4. Synergy UI System
+```gdscript
+# /src/scripts/ui/synergy_ui.gd
+class_name SynergyUI
+extends Control
+
+@export var synergy_card_scene: PackedScene
+@export var effect_preview_scene: PackedScene
+
+var active_cards: Dictionary = {}  # synergy_id: SynergyCard
+var preview_pool: ObjectPool
+
+func _ready() -> void:
+    _initialize_preview_pool()
+    _connect_signals()
+
+func show_available_synergy(synergy: SynergyData) -> void:
+    var card = synergy_card_scene.instantiate()
+    card.setup(synergy)
+    add_child(card)
+    
+    # Show preview effect
+    var preview = preview_pool.get_object()
+    if preview:
+        preview.show_synergy_preview(synergy)
+        card.mouse_entered.connect(
+            func(): preview.highlight()
+        )
+```
+
+## 5. Synergy Combination System
+```gdscript
+# /src/scripts/weapons/synergy_combination_system.gd
+class_name SynergyCombinationSystem
+extends Node
+
+signal combination_discovered(combo: SynergyCombination)
+signal special_effect_triggered(effect_name: String)
+
+@export var max_active_combinations: int = 3  # Performance limit
+
+var active_combinations: Array[SynergyCombination] = []
+var effect_pool: ObjectPool
+
+func _ready() -> void:
+    _initialize_pools()
+
+func try_combine_synergies(synergy1: SynergyData, synergy2: SynergyData) -> void:
+    if active_combinations.size() >= max_active_combinations:
+        return
+        
+    var combination = SynergyDatabase.get_combination(synergy1, synergy2)
+    if combination and _can_activate_combination(combination):
+        _activate_combination(combination)
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/synergy_test.tscn
+- Node2D (root)
+  - WeaponManager
+  - SynergyManager
+  - TestWeapons
+    - BasicWeapon
+    - SpecialWeapon
+  - EffectSystem
+  - PerformanceMonitor
+  - TestUI
+    - SynergyDisplay
+    - EffectPreview
+    - CombinationList
+```
+
+2. Test scenarios:
+- Synergy activation
+- Effect combinations
+- Visual feedback
+- Performance impact
+- Memory management
+- UI responsiveness
+- Weapon interactions
+
+## Next Steps
+
+1. Create special effects system
+2. Add boss variations
+3. Develop reward system
+4. Implement achievement system
+
+Would you like me to continue with any of these next steps? 

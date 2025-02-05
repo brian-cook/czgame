@@ -1,0 +1,187 @@
+# Reward Distribution System Implementation Plan
+
+## 1. Reward Manager
+```gdscript
+# /src/scripts/rewards/reward_manager.gd
+class_name RewardManager
+extends Node
+
+signal reward_generated(reward: RewardData)
+signal reward_collected(reward: RewardData)
+signal special_reward_available(reward: RewardData)
+
+@export_group("Reward Settings")
+@export var base_reward_curve: Curve
+@export var boss_reward_multiplier: float = 3.0
+@export var wave_completion_bonus: float = 1.5
+
+@export_group("Performance")
+@export var max_active_rewards: int = 50  # Performance limit
+@export var reward_pool_size: int = 100   # Memory optimization
+@export var effect_pool_size: int = 10    # Visual effects pool
+
+var reward_pools: Dictionary = {}  # type: ObjectPool
+var active_rewards: Array[Node] = []
+var pending_rewards: Array[RewardData] = []
+```
+
+## 2. Reward Data Resource
+```gdscript
+# /src/resources/rewards/reward_data.gd
+class_name RewardData
+extends Resource
+
+@export_group("Basic Info")
+@export var id: String = ""
+@export var type: String = "currency"  # currency, item, upgrade
+@export var rarity: int = 0
+@export var value: float = 1.0
+
+@export_group("Visual Settings")
+@export var icon: Texture2D
+@export var collect_effect: PackedScene
+@export var floating_text_color: Color
+
+@export_group("Spawn Settings")
+@export var spread_radius: float = 50.0
+@export var attraction_speed: float = 200.0
+@export var lifetime: float = 30.0
+
+func calculate_final_value(difficulty: float, player_level: int) -> float:
+    var base = value * (1.0 + (difficulty * 0.1))
+    var level_bonus = 1.0 + (player_level * 0.05)
+    return base * level_bonus
+```
+
+## 3. Reward Distribution System
+```gdscript
+# /src/scripts/rewards/reward_distribution.gd
+class_name RewardDistribution
+extends Node
+
+signal rewards_distributed(position: Vector2, rewards: Array)
+signal special_reward_spawned(reward: RewardData)
+
+@export var reward_manager: RewardManager
+@export var min_rewards_per_wave: int = 5
+@export var max_rewards_per_wave: int = 15  # Performance consideration
+
+var rarity_weights: Dictionary = {
+    "common": 70.0,
+    "uncommon": 20.0,
+    "rare": 8.0,
+    "epic": 2.0
+}
+
+func distribute_wave_rewards(difficulty: float, wave_number: int, position: Vector2) -> void:
+    var count = _calculate_reward_count(wave_number)
+    var rewards = _generate_rewards(count, difficulty)
+    
+    _spawn_rewards(rewards, position)
+    rewards_distributed.emit(position, rewards)
+
+func _spawn_rewards(rewards: Array, center: Vector2) -> void:
+    for reward in rewards:
+        if reward_manager.active_rewards.size() >= reward_manager.max_active_rewards:
+            pending_rewards.append(reward)
+            continue
+            
+        var spawn_pos = _get_spread_position(center, reward.spread_radius)
+        reward_manager.spawn_reward(reward, spawn_pos)
+```
+
+## 4. Boss Reward System
+```gdscript
+# /src/scripts/rewards/boss_reward_system.gd
+class_name BossRewardSystem
+extends Node
+
+signal special_reward_available(reward: RewardData)
+signal boss_rewards_spawned(rewards: Array)
+
+@export var guaranteed_rewards: Array[String] = []
+@export var bonus_reward_chance: float = 0.2
+@export var min_special_rewards: int = 1
+@export var max_special_rewards: int = 3
+
+func generate_boss_rewards(boss_tier: int, difficulty: float) -> Array:
+    var rewards = _generate_guaranteed_rewards(boss_tier)
+    rewards.append_array(_generate_bonus_rewards(difficulty))
+    
+    var special = _generate_special_rewards(boss_tier)
+    if not special.is_empty():
+        rewards.append_array(special)
+        special_reward_available.emit(special[0])
+    
+    return rewards
+```
+
+## 5. Reward Collection System
+```gdscript
+# /src/scripts/rewards/reward_collection.gd
+class_name RewardCollectionSystem
+extends Node
+
+signal reward_collected(reward: RewardData)
+signal collection_effect_played(position: Vector2)
+
+@export var collection_radius: float = 50.0
+@export var attraction_radius: float = 150.0
+@export var max_collection_rate: int = 10  # Performance optimization
+
+var collection_timer: float = 0.0
+var attracted_rewards: Dictionary = {}  # reward: initial_distance
+
+func _physics_process(delta: float) -> void:
+    collection_timer += delta
+    if collection_timer >= 1.0 / max_collection_rate:
+        collection_timer = 0.0
+        _process_collection()
+
+func _process_collection() -> void:
+    var player = get_tree().get_first_node_in_group("players")
+    if not player:
+        return
+        
+    for reward in reward_manager.active_rewards:
+        var distance = reward.global_position.distance_to(player.global_position)
+        
+        if distance <= collection_radius:
+            _collect_reward(reward)
+        elif distance <= attraction_radius:
+            _attract_reward(reward, player, distance)
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/reward_system_test.tscn
+- Node2D (root)
+  - RewardManager
+  - TestSpawner
+  - TestPlayer
+  - PerformanceMonitor
+  - TestUI
+    - RewardCounter
+    - RarityDisplay
+    - CollectionStats
+```
+
+2. Test scenarios:
+- Reward generation
+- Distribution patterns
+- Collection mechanics
+- Visual feedback
+- Performance impact
+- Memory management
+- Value scaling
+
+## Next Steps
+
+1. Polish state transitions
+2. Implement sound effects
+3. Add UI polish
+4. Create tutorial system
+
+Would you like me to continue with the state transition polish next? 

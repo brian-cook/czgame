@@ -1,0 +1,254 @@
+# Comfort Zone Implementation Plan
+
+## 1. Base Comfort Zone Scene
+```gdscript
+# /src/scenes/zones/comfort_zone.tscn
+- Area2D (root)
+  - CollisionShape2D (zone_area)
+  - Components
+    - EffectComponent
+    - ResourceDenialComponent
+    - VisibilityComponent
+    - UpgradeComponent
+  - Visuals
+    - Sprite2D (zone_sprite)
+    - GPUParticles2D (zone_particles)
+    - Line2D (border_line)
+  - AudioStreamPlayer2D (zone_audio)
+```
+
+## 2. Core Zone Behavior
+```gdscript
+# /src/scripts/zones/comfort_zone.gd
+class_name ComfortZone
+extends Area2D
+
+signal zone_activated
+signal zone_deactivated
+signal player_entered(player: Node2D)
+signal player_exited(player: Node2D)
+signal upgrade_applied(upgrade: ZoneUpgradeData)
+
+@export_group("Zone Properties")
+@export var zone_radius: float = 100.0
+@export var activation_time: float = 0.5
+@export var resource_denial_multiplier: float = 0.5
+
+@export_group("Components")
+@export var effect_component: ZoneEffectComponent
+@export var resource_denial: ResourceDenialComponent
+@export var visibility_component: VisibilityComponent
+@export var upgrade_component: ZoneUpgradeComponent
+
+# Performance optimization
+var entities_inside: Dictionary = {} # entity: entry_time
+var cached_positions: Dictionary = {} # entity: last_position
+var update_frequency: int = 3 # Update every N frames
+
+func _ready() -> void:
+    _setup_collision()
+    _initialize_components()
+    _start_activation()
+
+func _physics_process(_delta: float) -> void:
+    if Engine.get_frames_drawn() % update_frequency != 0:
+        return
+    
+    _update_entities()
+    _update_visuals()
+
+func _setup_collision() -> void:
+    var shape = CircleShape2D.new()
+    shape.radius = zone_radius
+    $CollisionShape2D.shape = shape
+    
+    # Set up collision layers
+    collision_layer = 0 # Zone layer
+    collision_mask = 2 | 4 # Player and Enemy layers
+
+func _update_entities() -> void:
+    for entity in entities_inside.keys():
+        if not is_instance_valid(entity):
+            entities_inside.erase(entity)
+            cached_positions.erase(entity)
+            continue
+            
+        var current_pos = entity.global_position
+        if current_pos != cached_positions[entity]:
+            cached_positions[entity] = current_pos
+            _handle_entity_moved(entity)
+
+func _handle_entity_moved(entity: Node2D) -> void:
+    if entity.is_in_group("enemies"):
+        visibility_component.update_entity_visibility(entity)
+    elif entity.is_in_group("resources"):
+        resource_denial.apply_denial(entity)
+```
+
+## 3. Zone Effect Component
+```gdscript
+# /src/scripts/zones/components/zone_effect_component.gd
+class_name ZoneEffectComponent
+extends Node
+
+signal effect_applied(effect_name: String, target: Node)
+signal effect_removed(effect_name: String, target: Node)
+
+@export var active_effects: Array[ZoneEffect] = []
+var affected_entities: Dictionary = {} # entity: Array[ZoneEffect]
+
+func _ready() -> void:
+    var parent_zone = get_parent() as ComfortZone
+    parent_zone.player_entered.connect(_on_entity_entered)
+    parent_zone.player_exited.connect(_on_entity_exited)
+
+func apply_effects(entity: Node) -> void:
+    if not affected_entities.has(entity):
+        affected_entities[entity] = []
+    
+    for effect in active_effects:
+        if effect.can_apply_to(entity):
+            effect.apply(entity)
+            affected_entities[entity].append(effect)
+            effect_applied.emit(effect.effect_name, entity)
+
+func remove_effects(entity: Node) -> void:
+    if not affected_entities.has(entity):
+        return
+    
+    for effect in affected_entities[entity]:
+        effect.remove(entity)
+        effect_removed.emit(effect.effect_name, entity)
+    
+    affected_entities.erase(entity)
+```
+
+## 4. Resource Denial Component
+```gdscript
+# /src/scripts/zones/components/resource_denial_component.gd
+class_name ResourceDenialComponent
+extends Node
+
+@export var denial_curve: Curve
+@export var update_frequency: int = 5
+
+var affected_resources: Dictionary = {} # resource: original_value
+
+func apply_denial(resource: Node) -> void:
+    if not resource.has_method("modify_value"):
+        return
+    
+    if not affected_resources.has(resource):
+        affected_resources[resource] = resource.get_value()
+    
+    var distance_factor = _calculate_distance_factor(resource)
+    var denial_factor = denial_curve.sample(distance_factor)
+    resource.modify_value(affected_resources[resource] * denial_factor)
+
+func _calculate_distance_factor(resource: Node) -> float:
+    var zone = get_parent() as ComfortZone
+    var distance = resource.global_position.distance_to(zone.global_position)
+    return clamp(distance / zone.zone_radius, 0.0, 1.0)
+```
+
+## 5. Zone Visibility Component
+```gdscript
+# /src/scripts/zones/components/zone_visibility_component.gd
+class_name ZoneVisibilityComponent
+extends Node
+
+var hidden_entities: Dictionary = {} # entity: original_visibility
+var quadtree: QuadTree
+
+func _ready() -> void:
+    var zone = get_parent() as ComfortZone
+    var bounds = Rect2(
+        zone.global_position - Vector2.ONE * zone.zone_radius,
+        Vector2.ONE * zone.zone_radius * 2
+    )
+    quadtree = QuadTree.new(bounds, 4)
+
+func update_entity_visibility(entity: Node2D) -> void:
+    if not entity.has_method("set_visibility"):
+        return
+    
+    var should_hide = _should_hide_entity(entity)
+    if should_hide and not hidden_entities.has(entity):
+        hidden_entities[entity] = entity.visible
+        entity.set_visibility(false)
+    elif not should_hide and hidden_entities.has(entity):
+        entity.set_visibility(hidden_entities[entity])
+        hidden_entities.erase(entity)
+
+func _should_hide_entity(entity: Node2D) -> bool:
+    var zone = get_parent() as ComfortZone
+    return entity.global_position.distance_to(zone.global_position) <= zone.zone_radius
+```
+
+## 6. Zone Upgrade Component
+```gdscript
+# /src/scripts/zones/components/zone_upgrade_component.gd
+class_name ZoneUpgradeComponent
+extends Node
+
+signal upgrade_added(upgrade: ZoneUpgradeData)
+signal upgrade_removed(upgrade: ZoneUpgradeData)
+
+var active_upgrades: Array[ZoneUpgradeData] = []
+var upgrade_effects: Dictionary = {} # upgrade_name: effect_instance
+
+func add_upgrade(upgrade: ZoneUpgradeData) -> void:
+    if not can_add_upgrade(upgrade):
+        return
+    
+    active_upgrades.append(upgrade)
+    var effect = upgrade.create_effect()
+    upgrade_effects[upgrade.name] = effect
+    add_child(effect)
+    upgrade_added.emit(upgrade)
+
+func remove_upgrade(upgrade: ZoneUpgradeData) -> void:
+    var index = active_upgrades.find(upgrade)
+    if index != -1:
+        active_upgrades.remove_at(index)
+        var effect = upgrade_effects[upgrade.name]
+        effect.queue_free()
+        upgrade_effects.erase(upgrade.name)
+        upgrade_removed.emit(upgrade)
+```
+
+## 7. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/comfort_zone_test.tscn
+- Node2D (root)
+  - ComfortZone
+  - TestEntities
+    - TestPlayer
+    - TestEnemies
+    - TestResources
+  - PerformanceMonitor
+  - TestUI
+    - ZoneStats
+    - UpgradePanel
+    - EffectList
+```
+
+2. Test scenarios:
+- Zone activation and deactivation
+- Entity visibility management
+- Resource denial system
+- Upgrade application
+- Performance with many entities
+- Component interaction
+- Visual feedback
+
+## Next Steps
+
+1. Implement Enemy AI interaction with zones
+2. Create zone upgrade system
+3. Develop resource spawning system
+4. Set up zone placement strategy
+
+Would you like me to continue with any of these next steps? 

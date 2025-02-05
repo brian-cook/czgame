@@ -1,0 +1,202 @@
+# Boss Combat System Implementation Plan
+
+## 1. Boss Data Resource
+```gdscript
+# /src/resources/bosses/boss_data.gd
+class_name BossData
+extends Resource
+
+@export_group("Basic Info")
+@export var id: String = ""
+@export var name: String = ""
+@export var description: String = ""
+@export var difficulty_tier: int = 1
+
+@export_group("Combat Settings")
+@export var max_health: float = 1000.0
+@export var phases: Array[BossPhase] = []
+@export var phase_transition_health: Array[float] = []
+@export var arena_size: Vector2 = Vector2(2000, 2000)
+
+@export_group("Performance Limits")
+@export var max_minions: int = 10
+@export var max_projectiles: int = 100
+@export var max_effects: int = 20
+```
+
+## 2. Boss Phase System
+```gdscript
+# /src/scripts/bosses/boss_phase_controller.gd
+class_name BossPhaseController
+extends Node
+
+signal phase_started(phase_index: int)
+signal phase_ended(phase_index: int)
+signal special_attack_started(attack_name: String)
+
+@export var attack_component: BossAttackComponent
+@export var state_component: BossStateComponent
+@export var effect_component: BossEffectComponent
+
+var current_phase: int = -1
+var phase_timer: float = 0.0
+var update_frequency: int = 2  # Performance optimization
+
+func _physics_process(delta: float) -> void:
+    if Engine.get_frames_drawn() % update_frequency != 0:
+        return
+        
+    _update_phase(delta)
+    _check_phase_transition()
+
+func _update_phase(delta: float) -> void:
+    phase_timer += delta
+    var phase = state_component.current_phase
+    
+    # Update phase-specific behaviors
+    match phase.behavior_type:
+        "aggressive":
+            _update_aggressive_phase(delta)
+        "defensive":
+            _update_defensive_phase(delta)
+        "special":
+            _update_special_phase(delta)
+```
+
+## 3. Boss Arena System
+```gdscript
+# /src/scripts/bosses/boss_arena_controller.gd
+class_name BossArenaController
+extends Node2D
+
+signal arena_activated
+signal hazard_spawned(hazard: Node2D)
+signal safe_zone_created(position: Vector2)
+
+@export var hazard_scene: PackedScene
+@export var safe_zone_scene: PackedScene
+@export var max_hazards: int = 15  # Performance limit
+
+var active_hazards: Array[Node2D] = []
+var hazard_pool: ObjectPool
+var current_layout: Dictionary = {}
+
+func _ready() -> void:
+    _initialize_pools()
+    _setup_arena_boundaries()
+
+func spawn_hazard_pattern(pattern_name: String, positions: Array[Vector2]) -> void:
+    if active_hazards.size() >= max_hazards:
+        return
+        
+    for pos in positions:
+        var hazard = hazard_pool.get_object()
+        if hazard:
+            hazard.global_position = pos
+            active_hazards.append(hazard)
+            hazard_spawned.emit(hazard)
+```
+
+## 4. Boss State Machine
+```gdscript
+# /src/scripts/bosses/boss_state_machine.gd
+class_name BossStateMachine
+extends Node
+
+enum BossState { INTRO, COMBAT, TRANSITION, SPECIAL, DEFEATED }
+
+signal state_changed(new_state: BossState)
+signal vulnerability_changed(is_vulnerable: bool)
+
+@export var intro_duration: float = 3.0
+@export var transition_duration: float = 2.0
+
+var current_state: BossState = BossState.INTRO
+var is_vulnerable: bool = false
+var state_timer: float = 0.0
+
+func _process(delta: float) -> void:
+    state_timer += delta
+    match current_state:
+        BossState.INTRO:
+            _update_intro_state()
+        BossState.COMBAT:
+            _update_combat_state()
+        BossState.TRANSITION:
+            _update_transition_state()
+        BossState.SPECIAL:
+            _update_special_state()
+```
+
+## 5. Boss Special Attack System
+```gdscript
+# /src/scripts/bosses/special_attack_system.gd
+class_name BossSpecialAttackSystem
+extends Node
+
+signal special_attack_charging(attack_name: String, charge_time: float)
+signal special_attack_released(attack_name: String)
+
+@export var telegraph_component: TelegraphComponent
+@export var effect_component: EffectComponent
+@export var charge_time: float = 1.5
+@export var warning_flash_count: int = 3
+
+var current_special: String = ""
+var is_charging: bool = false
+
+func start_special_attack(attack_name: String) -> void:
+    if is_charging:
+        return
+        
+    current_special = attack_name
+    is_charging = true
+    
+    # Show telegraph and warning
+    telegraph_component.show_special_telegraph(attack_name)
+    effect_component.play_charge_effect()
+    
+    # Start charge sequence
+    var tween = create_tween()
+    tween.tween_interval(charge_time)
+    tween.tween_callback(_release_special_attack)
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/boss_combat_test.tscn
+- Node2D (root)
+  - BossArena
+    - Boss
+      - PhaseController
+      - AttackComponent
+      - SpecialAttackSystem
+    - HazardManager
+    - ArenaEffects
+  - TestPlayer
+  - PerformanceMonitor
+  - BossUI
+    - HealthBar
+    - PhaseIndicator
+    - SpecialWarning
+```
+
+2. Test scenarios:
+- Phase transitions
+- Special attacks
+- Arena hazards
+- Performance under load
+- Visual clarity
+- Pattern combinations
+- Memory management
+
+## Next Steps
+
+1. Implement weapon synergies
+2. Create special effects system
+3. Add boss variations
+4. Develop reward system
+
+Would you like me to continue with any of these next steps? 

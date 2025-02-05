@@ -1,0 +1,181 @@
+# State Transition Polish Implementation Plan
+
+## 1. State Transition Manager
+```gdscript
+# /src/scripts/transitions/state_transition_manager.gd
+class_name StateTransitionManager
+extends Node
+
+signal transition_started(from_state: String, to_state: String)
+signal transition_completed(new_state: String)
+signal transition_effect_spawned(effect: Node)
+
+@export_group("Transition Settings")
+@export var default_duration: float = 0.3
+@export var transition_curve: Curve
+@export var screen_effect_layer: CanvasLayer
+
+@export_group("Performance")
+@export var max_concurrent_effects: int = 5  # Performance limit
+@export var effect_pool_size: int = 10      # Memory optimization
+
+var active_transitions: Dictionary = {}  # state_pair: TransitionEffect
+var effect_pools: Dictionary = {}        # effect_type: ObjectPool
+```
+
+## 2. Transition Effect System
+```gdscript
+# /src/scripts/transitions/transition_effect_system.gd
+class_name TransitionEffectSystem
+extends Node
+
+signal effect_started(effect_name: String)
+signal effect_completed(effect_name: String)
+
+@export_group("Visual Effects")
+@export var fade_material: ShaderMaterial
+@export var blur_material: ShaderMaterial
+@export var distortion_material: ShaderMaterial
+
+@export_group("Performance")
+@export var max_shader_complexity: int = 2  # Performance optimization
+@export var update_frequency: int = 2       # Reduce update frequency
+
+var active_effects: Array[Node] = []
+var transition_cache: Dictionary = {}  # Cache common transitions
+
+func play_transition_effect(from_state: String, to_state: String) -> void:
+    var effect = _get_appropriate_effect(from_state, to_state)
+    if not effect or active_effects.size() >= max_concurrent_effects:
+        return
+        
+    effect.play()
+    active_effects.append(effect)
+    effect_started.emit(effect.name)
+```
+
+## 3. State Transition Effects
+```gdscript
+# /src/scripts/transitions/state_transition_effects.gd
+class_name StateTransitionEffects
+extends Node
+
+@export_group("Game State Effects")
+@export var menu_to_game: PackedScene
+@export var wave_to_boss: PackedScene
+@export var game_to_pause: PackedScene
+
+@export_group("UI Effects")
+@export var ui_fade_duration: float = 0.2
+@export var ui_slide_distance: float = 100.0
+
+func _ready() -> void:
+    _initialize_effect_pools()
+    _connect_signals()
+
+func transition_game_state(from: String, to: String) -> void:
+    var effect_key = "%s_to_%s" % [from.to_lower(), to.to_lower()]
+    var effect_scene = get(effect_key)
+    
+    if effect_scene:
+        var effect = effect_scene.instantiate()
+        add_child(effect)
+        await effect.completed
+        effect.queue_free()
+```
+
+## 4. Camera Transition System
+```gdscript
+# /src/scripts/transitions/camera_transition_system.gd
+class_name CameraTransitionSystem
+extends Node
+
+signal camera_transition_started(type: String)
+signal camera_transition_completed
+
+@export var game_camera: Camera2D
+@export var transition_duration: float = 0.5
+@export var shake_reduction_rate: float = 0.5
+
+var current_trauma: float = 0.0
+var shake_offset: Vector2 = Vector2.ZERO
+
+func transition_to_boss_view() -> void:
+    var tween = create_tween()
+    tween.set_parallel(true)
+    
+    # Zoom out for boss arena
+    tween.tween_property(game_camera, "zoom", Vector2(0.8, 0.8), transition_duration)
+    
+    # Add slight rotation for drama
+    tween.tween_property(game_camera, "rotation_degrees", 
+        5.0, transition_duration * 0.5).set_ease(Tween.EASE_OUT)
+    tween.tween_property(game_camera, "rotation_degrees", 
+        0.0, transition_duration * 0.5).set_delay(transition_duration * 0.5)
+```
+
+## 5. UI Transition System
+```gdscript
+# /src/scripts/transitions/ui_transition_system.gd
+class_name UITransitionSystem
+extends Node
+
+signal ui_transition_started(ui_name: String)
+signal ui_transition_completed(ui_name: String)
+
+@export var transition_container: Control
+@export var default_duration: float = 0.2
+@export var stagger_time: float = 0.05
+
+var active_transitions: Dictionary = {}
+var transition_queue: Array = []
+
+func transition_ui_element(element: Control, transition_type: String) -> void:
+    if active_transitions.size() >= max_concurrent_effects:
+        transition_queue.append([element, transition_type])
+        return
+    
+    var tween = create_tween()
+    match transition_type:
+        "fade":
+            _apply_fade_transition(element, tween)
+        "slide":
+            _apply_slide_transition(element, tween)
+        "scale":
+            _apply_scale_transition(element, tween)
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/state_transition_test.tscn
+- Node2D (root)
+  - TransitionManager
+  - TestStates
+    - MenuState
+    - GameState
+    - BossState
+  - TestUI
+    - TransitionEffects
+    - StateIndicator
+  - PerformanceMonitor
+```
+
+2. Test scenarios:
+- State transitions
+- Visual effects
+- Camera movements
+- UI animations
+- Performance impact
+- Memory management
+- Transition chaining
+
+## Next Steps
+
+1. Implement sound effects
+2. Add UI polish
+3. Create tutorial system
+4. Add accessibility options
+
+Would you like me to continue with the sound effects system next? 

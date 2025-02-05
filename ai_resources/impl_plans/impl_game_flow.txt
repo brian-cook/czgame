@@ -1,0 +1,197 @@
+# Game Flow System Implementation Plan
+
+## 1. Game Flow Manager
+```gdscript
+# /src/scripts/flow/game_flow_manager.gd
+class_name GameFlowManager
+extends Node
+
+signal wave_started(wave_number: int)
+signal wave_completed(wave_number: int)
+signal difficulty_increased(new_level: float)
+signal game_state_changed(new_state: GameState)
+
+enum GameState { MENU, PREPARING, WAVE_ACTIVE, WAVE_COMPLETE, BOSS_FIGHT, GAME_OVER }
+
+@export var initial_preparation_time: float = 30.0
+@export var wave_completion_time: float = 10.0
+@export var difficulty_scale_rate: float = 0.1
+
+var current_state: GameState = GameState.MENU
+var current_wave: int = 0
+var difficulty_level: float = 1.0
+var wave_timer: Timer
+```
+
+## 2. Wave Generation System
+```gdscript
+# /src/scripts/flow/wave_generator.gd
+class_name WaveGenerator
+extends Node
+
+signal wave_composition_ready(composition: Dictionary)
+
+@export var min_enemies_per_wave: int = 10
+@export var max_enemies_per_wave: int = 50  # Performance limit
+@export var enemy_pool_size: int = 100      # Memory optimization
+
+var enemy_pools: Dictionary = {}  # type: ObjectPool
+var spawn_points: Array[Vector2] = []
+var current_composition: Dictionary = {}
+
+func generate_wave(wave_number: int, difficulty: float) -> Dictionary:
+    var composition = {
+        "basic": _calculate_enemy_count("basic", wave_number, difficulty),
+        "ranged": _calculate_enemy_count("ranged", wave_number, difficulty),
+        "elite": _calculate_enemy_count("elite", wave_number, difficulty),
+    }
+    
+    # Ensure we don't exceed performance limits
+    var total = composition.values().reduce(func(a, b): return a + b)
+    if total > max_enemies_per_wave:
+        _scale_composition(composition, max_enemies_per_wave)
+    
+    current_composition = composition
+    wave_composition_ready.emit(composition)
+    return composition
+```
+
+## 3. Difficulty Scaling System
+```gdscript
+# /src/scripts/flow/difficulty_scaler.gd
+class_name DifficultyScaler
+extends Node
+
+signal enemy_stats_scaled(enemy_type: String, stats: Dictionary)
+signal resource_scaling_updated(multiplier: float)
+
+@export var base_scaling_curve: Curve
+@export var boss_difficulty_multiplier: float = 1.5
+@export var max_difficulty_level: float = 10.0
+
+var current_difficulty: float = 1.0
+var wave_scaling: Dictionary = {}
+
+func calculate_enemy_stats(enemy_type: String, base_stats: Dictionary) -> Dictionary:
+    var scaled_stats = base_stats.duplicate()
+    var scaling_factor = _get_scaling_factor(enemy_type)
+    
+    for stat in scaled_stats:
+        match stat:
+            "health", "damage":
+                scaled_stats[stat] *= scaling_factor
+            "speed":
+                scaled_stats[stat] *= (1.0 + (scaling_factor - 1.0) * 0.5)
+    
+    enemy_stats_scaled.emit(enemy_type, scaled_stats)
+    return scaled_stats
+```
+
+## 4. Spawn Management System
+```gdscript
+# /src/scripts/flow/spawn_manager.gd
+class_name SpawnManager
+extends Node
+
+signal enemy_spawned(enemy: Node2D, position: Vector2)
+signal wave_spawning_completed
+
+@export var spawn_interval: float = 0.5
+@export var max_concurrent_spawns: int = 5  # Performance optimization
+@export var spawn_radius: float = 1000.0
+
+var active_enemies: Array[Node2D] = []
+var pending_spawns: Array = []
+var spawn_timer: Timer
+
+func spawn_wave(composition: Dictionary) -> void:
+    pending_spawns.clear()
+    
+    for enemy_type in composition:
+        for i in composition[enemy_type]:
+            pending_spawns.append(enemy_type)
+    
+    pending_spawns.shuffle()  # Randomize spawn order
+    _start_spawning()
+
+func _spawn_enemy(enemy_type: String) -> void:
+    if active_enemies.size() >= max_concurrent_spawns:
+        return
+        
+    var enemy = enemy_pools[enemy_type].get_object()
+    if enemy:
+        var spawn_pos = _get_valid_spawn_position()
+        enemy.global_position = spawn_pos
+        active_enemies.append(enemy)
+        enemy_spawned.emit(enemy, spawn_pos)
+```
+
+## 5. Game State Controller
+```gdscript
+# /src/scripts/flow/game_state_controller.gd
+class_name GameStateController
+extends Node
+
+signal state_entered(state: GameState)
+signal state_exited(state: GameState)
+
+@export var flow_manager: GameFlowManager
+@export var wave_generator: WaveGenerator
+@export var spawn_manager: SpawnManager
+
+var state_handlers: Dictionary = {}
+var transition_timers: Dictionary = {}
+
+func _ready() -> void:
+    _initialize_state_handlers()
+    _connect_signals()
+
+func transition_to(new_state: GameState) -> void:
+    var current = flow_manager.current_state
+    if state_handlers.has(current):
+        state_handlers[current].exit()
+        state_exited.emit(current)
+    
+    flow_manager.current_state = new_state
+    if state_handlers.has(new_state):
+        state_handlers[new_state].enter()
+        state_entered.emit(new_state)
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/game_flow_test.tscn
+- Node2D (root)
+  - GameFlowManager
+  - WaveGenerator
+  - SpawnManager
+  - DifficultyScaler
+  - TestEntities
+    - Player
+    - EnemyTypes
+  - PerformanceMonitor
+  - TestUI
+    - WaveIndicator
+    - DifficultyDisplay
+    - StateDebugger
+```
+
+2. Test scenarios:
+- Wave generation
+- Difficulty scaling
+- Spawn management
+- State transitions
+- Performance under load
+- Memory management
+- Game flow progression
+
+## Next Steps
+
+1. Implement level generation
+2. Add boss wave system
+3. Create reward distribution
+4. Polish state transitions
+
+Would you like me to continue with the level generation system next? 

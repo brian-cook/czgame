@@ -1,0 +1,29 @@
+# Phase 5: Zone Systems Checklist
+
+## 1. Zone Placement (zone_placement.gd)
+### Core System
+- [ ] Placement rules
+- [ ] Zone validation
+- [ ] Grid system
+- [ ] Zone overlapping
+
+### Zone Types
+- [ ] Resource zones
+- [ ] Combat zones
+- [ ] Safe zones
+- [ ] Special zones
+
+## 2. Comfort Zones (comfort_zones.gd)
+### Basic Features
+- [ ] Zone benefits
+- [ ] Resource generation
+- [ ] Player buffs
+- [ ] Enemy debuffs
+
+### Advanced Features
+- [ ] Zone expansion
+- [ ] Zone linking
+- [ ] Zone upgrades
+- [ ] Zone effects
+
+Progress: 0/16 tasks completed 

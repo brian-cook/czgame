@@ -1,0 +1,29 @@
+# Phase 3: Enemy Systems Checklist
+
+## 1. Enemy Base (enemy_base.gd)
+### Core Setup
+- [ ] Base enemy class
+- [ ] Stats system
+- [ ] State machine
+- [ ] Navigation
+
+### AI Components
+- [ ] Behavior tree
+- [ ] Target detection
+- [ ] Path finding
+- [ ] Decision making
+
+## 2. Attack Patterns (enemy_attacks.gd)
+### Basic Attacks
+- [ ] Melee attacks
+- [ ] Ranged attacks
+- [ ] Area attacks
+- [ ] Status effects
+
+### Pattern System
+- [ ] Attack combinations
+- [ ] Pattern randomization
+- [ ] Difficulty scaling
+- [ ] Attack timing
+
+Progress: 0/16 tasks completed 

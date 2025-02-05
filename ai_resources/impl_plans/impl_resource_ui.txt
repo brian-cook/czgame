@@ -1,0 +1,249 @@
+# Resource UI System Implementation Plan
+
+## 1. Resource HUD Manager
+```gdscript
+# /src/scripts/ui/resource_hud_manager.gd
+class_name ResourceHUDManager
+extends Control
+
+@export_group("UI References")
+@export var resource_container: Container
+@export var collection_effect_scene: PackedScene
+@export var update_frequency: int = 2  # Performance optimization
+
+var resource_displays: Dictionary = {}  # resource_type: ResourceDisplay
+var collection_effects_pool: ObjectPool
+var update_counter: int = 0
+
+func _ready() -> void:
+    _initialize_resource_displays()
+    _setup_effect_pool()
+    _connect_signals()
+
+func _physics_process(_delta: float) -> void:
+    update_counter += 1
+    if update_counter >= update_frequency:
+        update_counter = 0
+        _update_displays()
+
+func _connect_signals() -> void:
+    EventBus.resource_collected.connect(_on_resource_collected)
+    EventBus.resource_spawned.connect(_on_resource_spawned)
+```
+
+## 2. Resource Display Component
+```gdscript
+# /src/scripts/ui/components/resource_display.gd
+class_name ResourceDisplay
+extends Control
+
+@export_group("Visual Settings")
+@export var icon: TextureRect
+@export var count_label: Label
+@export var animation_player: AnimationPlayer
+@export var tween_duration: float = 0.3
+
+var current_value: float = 0.0
+var target_value: float = 0.0
+var resource_type: String
+
+func setup(type: String, initial_value: float = 0.0) -> void:
+    resource_type = type
+    current_value = initial_value
+    target_value = initial_value
+    _update_display()
+
+func update_value(new_value: float, animate: bool = true) -> void:
+    target_value = new_value
+    
+    if animate:
+        var tween = create_tween()
+        tween.tween_method(
+            _set_current_value,
+            current_value,
+            target_value,
+            tween_duration
+        )
+    else:
+        current_value = target_value
+        _update_display()
+
+func _set_current_value(value: float) -> void:
+    current_value = value
+    _update_display()
+
+func _update_display() -> void:
+    count_label.text = str(int(current_value))
+```
+
+## 3. Collection Effect System
+```gdscript
+# /src/scripts/ui/effects/collection_effect.gd
+class_name CollectionEffect
+extends Node2D
+
+@export var movement_curve: Curve
+@export var scale_curve: Curve
+@export var fade_curve: Curve
+@export var effect_duration: float = 0.5
+@export var icon: Texture2D
+
+var start_pos: Vector2
+var end_pos: Vector2
+var sprite: Sprite2D
+
+func _ready() -> void:
+    sprite = Sprite2D.new()
+    sprite.texture = icon
+    add_child(sprite)
+
+func play(from_pos: Vector2, to_pos: Vector2) -> void:
+    start_pos = from_pos
+    end_pos = to_pos
+    
+    var tween = create_tween()
+    tween.set_parallel(true)
+    
+    # Position tween
+    tween.tween_method(
+        _update_position,
+        0.0, 1.0,
+        effect_duration
+    )
+    
+    # Scale and fade tweens
+    tween.tween_method(
+        _update_visual,
+        0.0, 1.0,
+        effect_duration
+    )
+    
+    await tween.finished
+    queue_free()
+
+func _update_position(progress: float) -> void:
+    var curve_value = movement_curve.sample(progress)
+    position = start_pos.lerp(end_pos, curve_value)
+
+func _update_visual(progress: float) -> void:
+    var scale_value = scale_curve.sample(progress)
+    var fade_value = fade_curve.sample(progress)
+    
+    sprite.scale = Vector2.ONE * scale_value
+    sprite.modulate.a = fade_value
+```
+
+## 4. Resource Zone UI
+```gdscript
+# /src/scripts/ui/zone_resource_ui.gd
+class_name ZoneResourceUI
+extends Control
+
+@export var zone_reference: ComfortZone
+@export var resource_icon: TextureRect
+@export var denial_label: Label
+@export var update_frequency: int = 3
+
+var base_color: Color
+var update_counter: int = 0
+
+func _ready() -> void:
+    base_color = resource_icon.modulate
+    if zone_reference:
+        zone_reference.resource_denial_updated.connect(_on_denial_updated)
+
+func _physics_process(_delta: float) -> void:
+    update_counter += 1
+    if update_counter >= update_frequency:
+        update_counter = 0
+        _update_display()
+
+func _update_display() -> void:
+    if not is_instance_valid(zone_reference):
+        queue_free()
+        return
+    
+    var denial_value = zone_reference.resource_denial_multiplier
+    denial_label.text = "%d%%" % (denial_value * 100)
+    
+    # Visual feedback
+    resource_icon.modulate = base_color.lerp(
+        Color.RED,
+        1.0 - denial_value
+    )
+```
+
+## 5. Resource Tooltip System
+```gdscript
+# /src/scripts/ui/resource_tooltip.gd
+class_name ResourceTooltip
+extends Control
+
+@export var tooltip_offset: Vector2 = Vector2(10, 10)
+@export var fade_time: float = 0.2
+
+@onready var background: Panel = $Background
+@onready var title_label: Label = $Title
+@onready var value_label: Label = $Value
+@onready var description_label: Label = $Description
+
+var current_resource: Node
+
+func show_for_resource(resource: Node) -> void:
+    if not resource or not resource.has_method("get_tooltip_data"):
+        hide()
+        return
+    
+    current_resource = resource
+    var data = resource.get_tooltip_data()
+    
+    title_label.text = data.title
+    value_label.text = str(data.value)
+    description_label.text = data.description
+    
+    # Position near mouse but ensure on screen
+    var mouse_pos = get_global_mouse_position()
+    position = _get_valid_position(mouse_pos + tooltip_offset)
+    
+    # Fade in
+    modulate.a = 0
+    show()
+    var tween = create_tween()
+    tween.tween_property(self, "modulate:a", 1.0, fade_time)
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/resource_ui_test.tscn
+- Node2D (root)
+  - ResourceHUDManager
+  - TestResources
+    - ResourceSpawner
+    - CollectionPoints
+  - ComfortZone
+  - PerformanceMonitor
+  - TestUI
+    - ResourceDisplays
+    - CollectionEffects
+    - TooltipTest
+```
+
+2. Test scenarios:
+- Resource display updates
+- Collection animations
+- Zone denial feedback
+- Tooltip functionality
+- Performance with many effects
+- UI responsiveness
+- Memory management
+
+## Next Steps
+
+1. Develop tutorial system
+2. Add screen shake effects
+3. Implement achievement system
+4. Create save/load system
+
+Would you like me to continue with any of these next steps? 

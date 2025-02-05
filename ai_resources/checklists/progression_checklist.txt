@@ -1,0 +1,29 @@
+# Phase 6: Progression Systems Checklist
+
+## 1. Level System (level_system.gd)
+### Core Features
+- [ ] Experience system
+- [ ] Level calculation
+- [ ] Reward distribution
+- [ ] Level events
+
+### Meta Progression
+- [ ] Currency system
+- [ ] Permanent upgrades
+- [ ] Unlock system
+- [ ] Achievement tracking
+
+## 2. Upgrade Selection (upgrade_selection.gd)
+### Basic System
+- [ ] Upgrade pool
+- [ ] Selection UI
+- [ ] Rarity system
+- [ ] Effect application
+
+### Advanced Features
+- [ ] Synergy bonuses
+- [ ] Build paths
+- [ ] Special upgrades
+- [ ] Upgrade preview
+
+Progress: 0/16 tasks completed 

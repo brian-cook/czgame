@@ -1,0 +1,210 @@
+# Combat System Implementation Plan
+
+## 1. Base Weapon System
+```gdscript
+# /src/scripts/combat/weapon_base.gd
+class_name WeaponBase
+extends Node2D
+
+signal weapon_fired(weapon: WeaponBase, position: Vector2)
+signal ammo_changed(current: int, maximum: int)
+signal weapon_reloaded
+
+@export_group("Weapon Stats")
+@export var damage: float = 10.0
+@export var fire_rate: float = 1.0
+@export var projectile_speed: float = 800.0
+@export var spread_angle: float = 5.0
+
+@export_group("Components")
+@export var projectile_spawner: ProjectileSpawner
+@export var effect_component: WeaponEffectComponent
+@export var stats_component: WeaponStatsComponent
+
+var can_fire: bool = true
+var fire_timer: Timer
+
+func _ready() -> void:
+    _initialize_components()
+    _setup_timer()
+
+func _physics_process(_delta: float) -> void:
+    if Input.is_action_pressed("fire") and can_fire:
+        fire()
+
+func fire() -> void:
+    if not can_fire:
+        return
+        
+    can_fire = false
+    fire_timer.start()
+    
+    _spawn_projectile()
+    effect_component.play_fire_effects()
+    weapon_fired.emit(self, global_position)
+
+func _spawn_projectile() -> void:
+    var spread = randf_range(-spread_angle, spread_angle)
+    var direction = Vector2.RIGHT.rotated(global_rotation + deg_to_rad(spread))
+    
+    projectile_spawner.spawn_projectile(
+        global_position,
+        direction,
+        projectile_speed,
+        damage
+    )
+```
+
+## 2. Projectile System
+```gdscript
+# /src/scripts/combat/projectile_spawner.gd
+class_name ProjectileSpawner
+extends Node2D
+
+@export var projectile_scene: PackedScene
+@export var max_projectiles: int = 100  # Performance limit
+
+var projectile_pool: ObjectPool
+
+func _ready() -> void:
+    _initialize_pool()
+
+func spawn_projectile(pos: Vector2, direction: Vector2, speed: float, damage: float) -> void:
+    var projectile = projectile_pool.get_object()
+    if not projectile:
+        return
+        
+    projectile.global_position = pos
+    projectile.setup(direction, speed, damage)
+    projectile.tree_exited.connect(
+        func(): projectile_pool.return_object(projectile)
+    )
+```
+
+## 3. Damage System
+```gdscript
+# /src/scripts/combat/damage_system.gd
+class_name DamageSystem
+extends Node
+
+signal damage_dealt(target: Node, amount: float, source: Node)
+signal critical_hit(target: Node, amount: float)
+signal kill_confirmed(target: Node)
+
+@export var crit_chance: float = 0.1
+@export var crit_multiplier: float = 2.0
+
+func apply_damage(target: Node, amount: float, source: Node = null) -> void:
+    if not target.has_method("take_damage"):
+        return
+    
+    var final_damage = amount
+    var is_crit = randf() <= crit_chance
+    
+    if is_crit:
+        final_damage *= crit_multiplier
+        critical_hit.emit(target, final_damage)
+    
+    target.take_damage(final_damage)
+    damage_dealt.emit(target, final_damage, source)
+    
+    if target.has_method("is_dead") and target.is_dead():
+        kill_confirmed.emit(target)
+```
+
+## 4. Combat Effects System
+```gdscript
+# /src/scripts/combat/combat_effects_system.gd
+class_name CombatEffectsSystem
+extends Node
+
+signal effect_applied(effect_name: String, target: Node)
+signal effect_removed(effect_name: String, target: Node)
+
+var active_effects: Dictionary = {}  # target: Dictionary[effect_name: effect]
+var effect_pool: ObjectPool
+
+func _ready() -> void:
+    effect_pool = $EffectPool
+
+func apply_effect(effect_name: String, target: Node, duration: float = 0.0) -> void:
+    if not target.has_node("EffectComponent"):
+        return
+    
+    var effect = effect_pool.get_object()
+    if not effect:
+        return
+    
+    effect.setup(effect_name, duration)
+    target.get_node("EffectComponent").add_effect(effect)
+    
+    active_effects[target] = active_effects.get(target, {})
+    active_effects[target][effect_name] = effect
+    
+    effect_applied.emit(effect_name, target)
+```
+
+## 5. Combat Feedback System
+```gdscript
+# /src/scripts/combat/combat_feedback_system.gd
+class_name CombatFeedbackSystem
+extends Node
+
+@export var damage_numbers_scene: PackedScene
+@export var hit_effect_scene: PackedScene
+@export var crit_effect_scene: PackedScene
+
+var number_pool: ObjectPool
+var effect_pool: ObjectPool
+
+func _ready() -> void:
+    _initialize_pools()
+    _connect_signals()
+
+func _connect_signals() -> void:
+    DamageSystem.damage_dealt.connect(_on_damage_dealt)
+    DamageSystem.critical_hit.connect(_on_critical_hit)
+    DamageSystem.kill_confirmed.connect(_on_kill_confirmed)
+
+func show_damage_number(amount: float, position: Vector2, is_crit: bool = false) -> void:
+    var number = number_pool.get_object()
+    if not number:
+        return
+        
+    number.global_position = position
+    number.show_value(amount, is_crit)
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/combat_test.tscn
+- Node2D (root)
+  - Player
+    - WeaponSystem
+  - TestTargets
+    - DamageableTarget
+    - MovingTarget
+  - EffectSystem
+  - FeedbackSystem
+  - PerformanceMonitor
+```
+
+2. Test scenarios:
+- Weapon firing and accuracy
+- Damage calculation
+- Effect application
+- Visual feedback
+- Performance with many projectiles
+- Memory management
+- Combat feel
+
+## Next Steps
+
+1. Implement specific weapon types
+2. Create upgrade system
+3. Add enemy attack patterns
+4. Develop boss combat mechanics
+
+Would you like me to continue with any of these next steps? 

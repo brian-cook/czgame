@@ -1,0 +1,211 @@
+# Weapon Types Implementation Plan
+
+## 1. Weapon Data Resource
+```gdscript
+# /src/resources/weapons/weapon_data.gd
+class_name WeaponData
+extends Resource
+
+@export_group("Basic Info")
+@export var id: String = ""
+@export var name: String = ""
+@export var description: String = ""
+@export var icon: Texture2D
+@export var weapon_scene: PackedScene
+
+@export_group("Base Stats")
+@export var base_damage: float = 10.0
+@export var fire_rate: float = 1.0
+@export var projectile_speed: float = 800.0
+@export var energy_cost: float = 1.0
+@export var knockback_force: float = 100.0
+
+@export_group("Upgrade Info")
+@export var max_level: int = 5
+@export var upgrade_costs: Array[int] = []
+@export var damage_per_level: float = 5.0
+@export var fire_rate_per_level: float = 0.1
+```
+
+## 2. Specific Weapon Types
+
+### 2.1 Rapid Fire Weapon
+```gdscript
+# /src/scripts/weapons/rapid_fire_weapon.gd
+class_name RapidFireWeapon
+extends WeaponBase
+
+@export_group("Rapid Fire Settings")
+@export var heat_per_shot: float = 0.1
+@export var cooling_rate: float = 0.2
+@export var overheat_threshold: float = 1.0
+
+var current_heat: float = 0.0
+var is_overheated: bool = false
+
+func _physics_process(delta: float) -> void:
+    _handle_cooling(delta)
+    _handle_firing()
+
+func _handle_cooling(delta: float) -> void:
+    if current_heat > 0:
+        current_heat = max(0, current_heat - cooling_rate * delta)
+        if current_heat < overheat_threshold * 0.5:
+            is_overheated = false
+
+func _handle_firing() -> void:
+    if Input.is_action_pressed("fire") and can_fire and not is_overheated:
+        fire()
+        current_heat += heat_per_shot
+        if current_heat >= overheat_threshold:
+            is_overheated = true
+```
+
+### 2.2 Area Effect Weapon
+```gdscript
+# /src/scripts/weapons/area_weapon.gd
+class_name AreaWeapon
+extends WeaponBase
+
+@export_group("Area Settings")
+@export var area_radius: float = 100.0
+@export var damage_falloff: Curve
+@export var effect_duration: float = 0.5
+@export var max_targets: int = 8  # Performance limit
+
+func fire() -> void:
+    if not can_fire:
+        return
+    
+    can_fire = false
+    fire_timer.start()
+    
+    var targets = _get_targets_in_range()
+    _apply_area_damage(targets)
+    effect_component.play_area_effects(area_radius)
+    weapon_fired.emit(self, global_position)
+
+func _get_targets_in_range() -> Array:
+    var space = get_world_2d().direct_space_state
+    var query = PhysicsShapeQueryParameters2D.new()
+    var shape = CircleShape2D.new()
+    shape.radius = area_radius
+    query.shape = shape
+    query.transform = global_transform
+    query.collision_mask = enemy_mask
+    
+    var results = space.intersect_shape(query, max_targets)
+    return results.map(func(dict): return dict.collider)
+```
+
+### 2.3 Charged Weapon
+```gdscript
+# /src/scripts/weapons/charged_weapon.gd
+class_name ChargedWeapon
+extends WeaponBase
+
+@export_group("Charge Settings")
+@export var min_charge_time: float = 0.2
+@export var max_charge_time: float = 2.0
+@export var charge_damage_curve: Curve
+@export var charge_size_curve: Curve
+
+var charge_start_time: float = 0.0
+var is_charging: bool = false
+
+func _physics_process(_delta: float) -> void:
+    if Input.is_action_just_pressed("fire"):
+        start_charging()
+    elif Input.is_action_just_released("fire") and is_charging:
+        release_charge()
+
+func start_charging() -> void:
+    if not can_fire:
+        return
+    
+    is_charging = true
+    charge_start_time = Time.get_ticks_msec() / 1000.0
+    effect_component.play_charge_effect()
+
+func release_charge() -> void:
+    if not is_charging:
+        return
+    
+    var charge_time = (Time.get_ticks_msec() / 1000.0) - charge_start_time
+    charge_time = clamp(charge_time, min_charge_time, max_charge_time)
+    
+    var charge_factor = (charge_time - min_charge_time) / (max_charge_time - min_charge_time)
+    var damage_mult = charge_damage_curve.sample(charge_factor)
+    var size_mult = charge_size_curve.sample(charge_factor)
+    
+    _fire_charged_projectile(damage_mult, size_mult)
+    is_charging = false
+```
+
+## 3. Weapon Manager
+```gdscript
+# /src/scripts/weapons/weapon_manager.gd
+class_name WeaponManager
+extends Node
+
+signal weapon_added(weapon_data: WeaponData)
+signal weapon_upgraded(weapon_data: WeaponData, level: int)
+
+var available_weapons: Dictionary = {}  # id: WeaponData
+var active_weapons: Dictionary = {}     # id: WeaponBase
+var weapon_levels: Dictionary = {}      # id: int
+
+func _ready() -> void:
+    _load_weapons()
+
+func add_weapon(weapon_id: String) -> void:
+    if not available_weapons.has(weapon_id):
+        return
+    
+    var data = available_weapons[weapon_id]
+    var weapon = data.weapon_scene.instantiate()
+    weapon.setup(data)
+    
+    active_weapons[weapon_id] = weapon
+    weapon_levels[weapon_id] = 1
+    add_child(weapon)
+    
+    weapon_added.emit(data)
+```
+
+## 4. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/weapon_types_test.tscn
+- Node2D (root)
+  - WeaponManager
+  - TestWeapons
+    - RapidFireTest
+    - AreaWeaponTest
+    - ChargedWeaponTest
+  - TestTargets
+  - PerformanceMonitor
+  - TestUI
+    - WeaponStats
+    - DamageOutput
+    - HeatIndicator
+```
+
+2. Test scenarios:
+- Weapon switching
+- Damage output
+- Effect combinations
+- Performance limits
+- Visual feedback
+- Upgrade system
+- Memory management
+
+## Next Steps
+
+1. Create weapon upgrade system
+2. Add enemy attack patterns
+3. Develop boss combat mechanics
+4. Implement weapon synergies
+
+Would you like me to continue with any of these next steps? 

@@ -1,0 +1,42 @@
+# Phase 2: Player & Basic Systems Checklist
+
+## 1. Player Controller (player_controller.gd)
+### Basic Movement
+- [ ] Character body setup
+- [ ] Input handling
+- [ ] Movement physics
+- [ ] Collision handling
+
+### Advanced Movement
+- [ ] Dash system
+- [ ] Knockback handling
+- [ ] Movement states
+- [ ] Animation integration
+
+## 2. Combat System (combat_system.gd)
+### Base Combat
+- [ ] Attack system
+- [ ] Damage calculation
+- [ ] Hit detection
+- [ ] Combat states
+
+### Advanced Combat
+- [ ] Combo system
+- [ ] Weapon switching
+- [ ] Special abilities
+- [ ] Combat feedback
+
+## 3. Camera System (camera_controller.gd)
+### Basic Camera
+- [ ] Follow behavior
+- [ ] Zoom control
+- [ ] Screen boundaries
+- [ ] Smoothing
+
+### Camera Effects
+- [ ] Screen shake
+- [ ] Combat zoom
+- [ ] Focus system
+- [ ] Transition effects
+
+Progress: 0/20 tasks completed 

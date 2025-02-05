@@ -1,0 +1,207 @@
+# Enemy Awareness Visual Feedback Implementation Plan
+
+## 1. Enemy Awareness Indicator Component
+```gdscript
+# /src/scripts/enemies/components/awareness_indicator.gd
+class_name AwarenessIndicator
+extends Node2D
+
+@export_group("Visual Settings")
+@export var indicator_texture: Texture2D
+@export var base_color: Color = Color.WHITE
+@export var alert_color: Color = Color.RED
+@export var fade_time: float = 0.3
+
+@export_group("Performance Settings")
+@export var update_frequency: int = 2  # Update every N frames
+@export var max_indicators: int = 50  # Limit total indicators for performance
+
+@onready var sprite: Sprite2D = $Sprite
+@onready var animation_player: AnimationPlayer = $AnimationPlayer
+
+var current_awareness: float = 0.0
+var update_counter: int = 0
+
+func _ready() -> void:
+    # Set up initial state
+    sprite.texture = indicator_texture
+    sprite.modulate = base_color
+    
+    # Performance optimization: Only show for on-screen enemies
+    var visibility_notifier = VisibilityNotifier2D.new()
+    add_child(visibility_notifier)
+    visibility_notifier.screen_entered.connect(_on_screen_entered)
+    visibility_notifier.screen_exited.connect(_on_screen_exited)
+
+func _physics_process(_delta: float) -> void:
+    update_counter += 1
+    if update_counter >= update_frequency:
+        update_counter = 0
+        _update_indicator()
+
+func update_awareness(value: float) -> void:
+    current_awareness = value
+    # Immediate color update for significant changes
+    if abs(current_awareness - sprite.modulate.a) > 0.3:
+        _update_indicator()
+
+func _update_indicator() -> void:
+    var target_color = base_color.lerp(alert_color, current_awareness)
+    target_color.a = current_awareness
+    
+    var tween = create_tween()
+    tween.tween_property(sprite, "modulate", target_color, fade_time)
+```
+
+## 2. Zone Detection Effect
+```gdscript
+# /src/scripts/enemies/effects/zone_detection_effect.gd
+class_name ZoneDetectionEffect
+extends Node2D
+
+@export var particle_effect: GPUParticles2D
+@export var detection_ring: Line2D
+@export var max_radius: float = 100.0
+
+var current_awareness: float = 0.0
+var is_active: bool = false
+
+func _ready() -> void:
+    # Initialize particle system with object pooling
+    if particle_effect:
+        particle_effect.emitting = false
+        particle_effect.one_shot = false
+        
+    if detection_ring:
+        _setup_detection_ring()
+
+func show_detection(awareness: float, instant: bool = false) -> void:
+    current_awareness = awareness
+    is_active = awareness > 0
+    
+    if instant:
+        _update_visuals()
+    else:
+        var tween = create_tween()
+        tween.tween_method(_update_visuals, 
+                          detection_ring.scale.x, 
+                          awareness, 
+                          0.2)
+
+func _update_visuals(value: float) -> void:
+    if detection_ring:
+        detection_ring.scale = Vector2.ONE * value
+        detection_ring.modulate.a = value
+    
+    if particle_effect:
+        particle_effect.amount = int(20 * value)
+        particle_effect.emitting = value > 0
+```
+
+## 3. Enemy State Indicator
+```gdscript
+# /src/scripts/enemies/ui/enemy_state_indicator.gd
+class_name EnemyStateIndicator
+extends Node2D
+
+@export var icon_offset: Vector2 = Vector2(0, -50)
+@export var state_icons: Dictionary = {
+    "alert": preload("res://assets/sprites/ui/alert_icon.png"),
+    "suspicious": preload("res://assets/sprites/ui/suspicious_icon.png"),
+    "searching": preload("res://assets/sprites/ui/searching_icon.png")
+}
+
+@onready var icon_sprite: Sprite2D = $IconSprite
+@onready var animation_player: AnimationPlayer = $AnimationPlayer
+
+func show_state(state: String) -> void:
+    if not state_icons.has(state):
+        hide()
+        return
+    
+    icon_sprite.texture = state_icons[state]
+    show()
+    
+    # Play appropriate animation
+    var anim_name = "show_" + state
+    if animation_player.has_animation(anim_name):
+        animation_player.play(anim_name)
+```
+
+## 4. Awareness Manager
+```gdscript
+# /src/scripts/enemies/awareness_manager.gd
+class_name AwarenessManager
+extends Node
+
+signal global_awareness_changed(level: float)
+
+@export var awareness_fade_rate: float = 0.5
+@export var max_aware_enemies: int = 10  # Performance limit
+
+var aware_enemies: Dictionary = {}  # enemy: awareness_level
+var global_awareness: float = 0.0
+
+func _process(delta: float) -> void:
+    _update_global_awareness(delta)
+
+func register_enemy_awareness(enemy: Node2D, awareness: float) -> void:
+    if aware_enemies.size() >= max_aware_enemies and not aware_enemies.has(enemy):
+        return
+    
+    aware_enemies[enemy] = awareness
+    _update_enemy_feedback(enemy, awareness)
+
+func _update_global_awareness(delta: float) -> void:
+    var total_awareness = 0.0
+    var valid_enemies = 0
+    
+    for enemy in aware_enemies.keys():
+        if is_instance_valid(enemy):
+            total_awareness += aware_enemies[enemy]
+            valid_enemies += 1
+        else:
+            aware_enemies.erase(enemy)
+    
+    if valid_enemies > 0:
+        global_awareness = total_awareness / valid_enemies
+    else:
+        global_awareness = move_toward(global_awareness, 0.0, awareness_fade_rate * delta)
+    
+    global_awareness_changed.emit(global_awareness)
+```
+
+## 5. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/enemy_awareness_test.tscn
+- Node2D (root)
+  - ComfortZone
+  - TestEnemies
+    - BasicEnemy
+    - RangedEnemy
+  - AwarenessManager
+  - PerformanceMonitor
+  - TestUI
+    - AwarenessDebug
+    - StateIndicators
+    - GlobalAwarenessBar
+```
+
+2. Test scenarios:
+- Awareness indicator visibility
+- State transitions
+- Performance with many enemies
+- Visual clarity
+- Particle effect optimization
+- Animation smoothness
+
+## Next Steps
+
+1. Implement sound effects system
+2. Create resource UI system
+3. Develop tutorial system
+4. Add screen shake effects
+
+Would you like me to continue with any of these next steps? 

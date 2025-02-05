@@ -1,0 +1,343 @@
+# Godot Performance Optimization Guidelines
+
+## 1. Sprite and Visual Optimization
+### Texture Settings
+- Enable texture compression
+- Use appropriate texture sizes (power of 2)
+- Implement texture atlases
+- Use sprite sheets for animations
+- Disable mipmaps for 2D sprites
+
+### Sprite Management
+- Implement object pooling for sprites
+- Use visibility notifiers
+- Implement culling for off-screen objects
+- Batch similar sprites together
+- Use static sprites where possible
+
+### Animation Optimization
+- Use sprite sheet animations over skeletal when possible
+- Implement frame skipping for distant objects
+- Use simplified animations for background elements
+- Cache animation players
+
+## 2. Enemy and Object Management
+### Object Pooling Implementation
+
+Basic object pool
+class_name ObjectPool
+extends Node
+var available_objects: Array[Node] = []
+var scene_to_instantiate: PackedScene
+func initialize(scene: PackedScene, initial_size: int) -> void:
+scene_to_instantiate = scene
+for i in initial_size:
+var instance = scene.instantiate()
+available_objects.push_back(instance)
+add_child(instance)
+instance.visible = false
+func get_object() -> Node:
+if available_objects.is_empty():
+var instance = scene_to_instantiate.instantiate()
+add_child(instance)
+return instance
+return available_objects.pop_back()
+func return_object(object: Node) -> void:
+object.visible = false
+available_objects.push_back(object)
+
+### Enemy Management
+- Use quadtrees for spatial partitioning
+- Implement different update rates based on distance
+- Use simplified AI for distant enemies
+- Batch enemy updates
+- Implement enemy caps per area
+
+## 3. Physics Optimization
+### Collision Detection
+- Use simplified collision shapes
+- Implement collision layers
+- Disable collision processing when not needed
+- Use Area2D for triggers instead of physics bodies
+- Implement broad phase collision detection
+
+### Physics Processing
+- Limit physics processing to necessary objects
+- Use physics layers to prevent unnecessary checks
+- Implement custom broadphase when needed
+- Use RayCast2D for simple checks instead of Area2D
+
+## 4. Memory Management
+### Resource Loading
+
+# Preload commonly used resources
+const ENEMY_SCENE := preload("res://scenes/enemies/basic_enemy.tscn")
+const BULLET_SCENE := preload("res://scenes/weapons/bullet.tscn")
+
+# Load resources as needed
+func _ready() -> void:
+    ResourceLoader.load_threaded_request(
+        "res://assets/sprites/large_texture.png"
+    )
+
+### Memory Cleanup
+- Implement proper node cleanup
+- Use queue_free() instead of free()
+- Clear arrays and dictionaries when emptying
+- Implement reference counting for shared resources
+- Use weak references when appropriate
+
+## 5. Rendering Optimization
+### Visibility
+- Use VisibilityNotifier2D nodes
+- Implement occlusion culling
+- Use viewport culling
+- Disable processing of off-screen objects
+- Implement LOD (Level of Detail) system
+
+### Draw Calls
+- Batch similar sprites
+- Use static bodies where possible
+- Minimize canvas item changes
+- Use y-sort only when necessary
+- Implement z-indexing efficiently
+
+## 6. Code Optimization
+### Signal Management
+
+# Use direct calls for frequent updates
+func _physics_process(delta: float) -> void:
+    update_position(delta)
+
+# Use signals for infrequent events
+signal enemy_died
+signal score_changed(new_score: int)
+
+### Update Loops
+- Use _process only when needed
+- Implement custom update rates
+- Use timers for delayed events
+- Batch updates where possible
+- Use coroutines for complex operations
+
+## 7. Monitoring and Profiling
+### Performance Monitor
+
+func _process(_delta: float) -> void:
+    if OS.is_debug_build():
+        print("FPS: ", Engine.get_frames_per_second())
+        print("Objects: ", get_tree().get_node_count())
+        print("Draw Calls: ", Performance.get_monitor(
+            Performance.RENDER_DRAW_CALLS_IN_FRAME
+        ))
+
+### Debug Tools
+- Use the built-in profiler
+- Monitor memory usage
+- Track object count
+- Monitor draw calls
+- Profile physics performance
+
+## 8. Specific Optimizations for Large Numbers of Enemies
+### Spatial Partitioning
+
+class_name QuadTree
+extends Node2D
+
+var boundary: Rect2
+var capacity: int
+var objects: Array[Node2D] = []
+var divided: bool = false
+
+func subdivide() -> void:
+    # Subdivision implementation
+    pass
+
+func insert(object: Node2D) -> bool:
+    # Insertion implementation
+    pass
+
+func query(range: Rect2) -> Array[Node2D]:
+    # Query implementation
+    pass
+
+### Update Scheduling
+- Implement different update rates for different enemies
+- Use distance-based update frequencies
+- Batch enemy updates
+- Implement priority queues for updates
+- Use spatial hashing for quick lookups
+
+## 9. Performance Testing
+### Benchmarking
+- Create stress test scenes
+- Monitor performance metrics
+- Test with maximum expected entities
+- Profile memory usage
+- Test on target platforms
+
+### Optimization Checklist
+- [ ] Implement object pooling
+- [ ] Set up spatial partitioning
+- [ ] Optimize texture usage
+- [ ] Configure collision layers
+- [ ] Set up culling systems
+- [ ] Implement LOD system
+- [ ] Profile and optimize draw calls
+- [ ] Test with maximum entity count
+
+## 10. Specific Optimizations for Survival Action Games
+
+### Wave Management
+
+class_name WaveManager
+extends Node
+var active_enemies: Array[Node2D] = []
+var enemy_pool: ObjectPool
+var spawn_points: Array[Node2D] = []
+Different update frequencies based on distance
+const UPDATE_FREQUENCIES = {
+"CLOSE": 1, # Update every frame
+"MEDIUM": 3, # Update every 3 frames
+"FAR": 6 # Update every 6 frames
+}
+func physics_process(_delta: float) -> void:
+var frame = Engine.get_frames_drawn()
+for enemy in active_enemies:
+var distance = enemy.global_position.distance_to(player.global_position)
+# Update based on distance
+if distance < 300 and frame % UPDATE_FREQUENCIES.CLOSE == 0:
+enemy.update_behavior()
+elif distance < 600 and frame % UPDATE_FREQUENCIES.MEDIUM == 0:
+enemy.update_behavior()
+elif frame % UPDATE_FREQUENCIES.FAR == 0:
+enemy.update_behavior()
+
+### Comfort Zone Optimization
+
+class_name ComfortZoneManager
+extends Node2D
+
+var active_zones: Array[Area2D] = []
+var cached_enemy_states: Dictionary = {}
+
+func _physics_process(_delta: float) -> void:
+    # Update only enemies near comfort zones
+    for zone in active_zones:
+        var nearby_enemies = zone.get_overlapping_bodies()
+        for enemy in nearby_enemies:
+            if not cached_enemy_states.has(enemy):
+                cached_enemy_states[enemy] = enemy.current_state
+            enemy.set_invisible_target()
+    
+    # Restore enemies that left zones
+    var to_remove = []
+    for enemy in cached_enemy_states:
+        if not _is_near_any_zone(enemy):
+            enemy.restore_state(cached_enemy_states[enemy])
+            to_remove.append(enemy)
+    
+    for enemy in to_remove:
+        cached_enemy_states.erase(enemy)
+
+### Resource Collection Optimization
+
+class_name ResourceManager
+extends Node
+
+var resource_pool: ObjectPool
+var active_resources: Array[Node2D] = []
+const MAX_ACTIVE_RESOURCES = 200
+
+func spawn_resource(position: Vector2) -> void:
+    if active_resources.size() >= MAX_ACTIVE_RESOURCES:
+        # Recycle oldest resource
+        var oldest = active_resources.pop_front()
+        oldest.position = position
+        active_resources.push_back(oldest)
+    else:
+        var resource = resource_pool.get_object()
+        resource.position = position
+        active_resources.push_back(resource)
+
+### Enemy Group Behavior Optimization
+
+class_name EnemyGroup
+extends Node2D
+
+var members: Array[Node2D] = []
+const GROUP_UPDATE_INTERVAL = 5
+var update_counter = 0
+
+# Update group behavior less frequently than individual behavior
+func _physics_process(_delta: float) -> void:
+    update_counter += 1
+    if update_counter >= GROUP_UPDATE_INTERVAL:
+        update_counter = 0
+        _update_group_behavior()
+
+func _update_group_behavior() -> void:
+    var center = Vector2.ZERO
+    for member in members:
+        center += member.global_position
+    center /= members.size()
+    
+    # Update group movement based on center position
+    for member in members:
+        member.update_group_position(center)
+
+### Visual Effects Optimization
+
+class_name EffectManager
+extends Node2D
+
+var effect_pools: Dictionary = {}
+const MAX_PARTICLES_PER_EFFECT = 50
+
+func initialize_effect_pool(effect_name: String, scene: PackedScene) -> void:
+    var pool = ObjectPool.new()
+    pool.initialize(scene, MAX_PARTICLES_PER_EFFECT)
+    effect_pools[effect_name] = pool
+
+func spawn_effect(effect_name: String, position: Vector2) -> void:
+    if not effect_pools.has(effect_name):
+        return
+        
+    var effect = effect_pools[effect_name].get_object()
+    effect.global_position = position
+    effect.emitting = true
+    
+    # Auto-return to pool when complete
+    await effect.finished
+    effect_pools[effect_name].return_object(effect)
+
+### Performance Monitoring for Our Game Type
+
+class_name PerformanceMonitor
+extends Node
+
+var metrics = {
+    "active_enemies": 0,
+    "active_resources": 0,
+    "comfort_zones": 0,
+    "effects_active": 0,
+    "update_time": 0.0
+}
+
+func _process(_delta: float) -> void:
+    if not OS.is_debug_build():
+        return
+        
+    var time_start = Time.get_ticks_usec()
+    
+    metrics.active_enemies = get_tree().get_nodes_in_group("enemies").size()
+    metrics.active_resources = get_tree().get_nodes_in_group("resources").size()
+    metrics.comfort_zones = get_tree().get_nodes_in_group("comfort_zones").size()
+    metrics.effects_active = get_tree().get_nodes_in_group("effects").size()
+    
+    metrics.update_time = (Time.get_ticks_usec() - time_start) / 1000.0
+    
+    if metrics.update_time > 16.67:  # More than 1 frame at 60 FPS
+        print("Performance warning: Update took %f ms" % metrics.update_time)
+        print("Active entities:", metrics)
+

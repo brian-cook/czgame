@@ -1,0 +1,29 @@
+# Phase 8: Level & Flow Checklist
+
+## 1. Level Generation (level_generator.gd)
+### Core Generation
+- [ ] Room generation
+- [ ] Layout system
+- [ ] Connection system
+- [ ] Navigation mesh
+
+### Level Features
+- [ ] Room types
+- [ ] Obstacle placement
+- [ ] Resource placement
+- [ ] Special areas
+
+## 2. Game Flow (game_flow.gd)
+### Wave System
+- [ ] Wave generation
+- [ ] Enemy spawning
+- [ ] Difficulty scaling
+- [ ] Wave rewards
+
+### State Management
+- [ ] Game states
+- [ ] Transitions
+- [ ] Event handling
+- [ ] Flow control
+
+Progress: 0/16 tasks completed 

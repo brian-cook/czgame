@@ -1,0 +1,322 @@
+# Core Systems Implementation Plan
+
+## 1. GameManager Singleton
+```gdscript
+# /src/autoload/game_manager.gd
+extends Node
+
+enum GameState { MENU, PLAYING, PAUSED, GAME_OVER }
+
+signal game_state_changed(new_state: GameState)
+signal score_updated(new_score: int)
+signal wave_started(wave_number: int)
+signal wave_completed(wave_number: int)
+signal meta_progress_updated(progress: Dictionary)
+
+var current_state: GameState = GameState.MENU
+var score: int = 0
+var current_wave: int = 0
+var meta_progress: Dictionary = {}
+
+func _ready() -> void:
+    load_meta_progress()
+
+func change_state(new_state: GameState) -> void:
+    current_state = new_state
+    game_state_changed.emit(new_state)
+
+func add_score(value: int) -> void:
+    score += value
+    score_updated.emit(score)
+    
+func start_wave() -> void:
+    current_wave += 1
+    wave_started.emit(current_wave)
+
+func complete_wave() -> void:
+    wave_completed.emit(current_wave)
+    update_meta_progress("waves_completed", current_wave)
+
+func update_meta_progress(key: String, value: Variant) -> void:
+    meta_progress[key] = value
+    save_meta_progress()
+    meta_progress_updated.emit(meta_progress)
+
+func save_meta_progress() -> void:
+    var save_game = FileAccess.open("user://meta_progress.save", FileAccess.WRITE)
+    save_game.store_line(JSON.stringify(meta_progress))
+
+func load_meta_progress() -> void:
+    if not FileAccess.file_exists("user://meta_progress.save"):
+        return
+    var save_game = FileAccess.open("user://meta_progress.save", FileAccess.READ)
+    meta_progress = JSON.parse_string(save_game.get_line())
+```
+
+## 2. EventBus Singleton
+```gdscript
+# /src/autoload/event_bus.gd
+extends Node
+
+# Game Flow
+signal experience_gained(amount: int)
+signal level_up(new_level: int)
+signal achievement_unlocked(achievement_id: String)
+
+# Combat
+signal damage_dealt(target: Node, amount: float, source: Node)
+signal enemy_died(enemy: Node)
+signal player_died
+signal weapon_fired(weapon: Node2D, position: Vector2)
+
+# Comfort Zones
+signal zone_placed(zone: Node2D, position: Vector2)
+signal zone_activated(zone: Node2D)
+signal zone_entered(zone: Node2D, entity: Node2D)
+signal zone_exited(zone: Node2D, entity: Node2D)
+
+# Resources
+signal resource_collected(type: String, amount: int)
+signal resource_spawned(type: String, position: Vector2)
+
+# UI
+signal build_preview_requested(build_data: Resource)
+signal build_confirmed(build_data: Resource)
+signal ui_refresh_requested
+```
+
+## 3. ResourceManager Singleton
+```gdscript
+# /src/autoload/resource_manager.gd
+extends Node
+
+# Scene paths
+const SCENES = {
+    "PLAYER": "res://src/scenes/player/player.tscn",
+    "BASIC_ENEMY": "res://src/scenes/enemies/basic_enemy.tscn",
+    "COMFORT_ZONE": "res://src/scenes/zones/comfort_zone.tscn",
+    "RESOURCE_PICKUP": "res://src/scenes/pickups/resource_pickup.tscn"
+}
+
+# Object pools
+var object_pools: Dictionary = {}
+var resource_cache: Dictionary = {}
+var preloaded_scenes: Dictionary = {}
+
+func _ready() -> void:
+    _preload_scenes()
+    _initialize_common_pools()
+
+func _preload_scenes() -> void:
+    for key in SCENES:
+        preloaded_scenes[key] = load(SCENES[key])
+
+func _initialize_common_pools() -> void:
+    # Initialize pools for frequently spawned objects
+    create_pool("BASIC_ENEMY", 50)
+    create_pool("RESOURCE_PICKUP", 100)
+    create_pool("PROJECTILE", 200)
+    create_pool("EFFECT", 50)
+
+func create_pool(scene_key: String, initial_size: int) -> ObjectPool:
+    if not object_pools.has(scene_key):
+        var pool = ObjectPool.new()
+        pool.initialize(get_scene(scene_key), initial_size)
+        add_child(pool)
+        object_pools[scene_key] = pool
+    return object_pools[scene_key]
+
+func get_scene(scene_key: String) -> PackedScene:
+    return preloaded_scenes[scene_key]
+
+func get_from_pool(pool_key: String) -> Node:
+    if not object_pools.has(pool_key):
+        push_error("Pool not found: %s" % pool_key)
+        return null
+    return object_pools[pool_key].get_object()
+
+func return_to_pool(pool_key: String, object: Node) -> void:
+    if object_pools.has(pool_key):
+        object_pools[pool_key].return_object(object)
+```
+
+## 4. ObjectPool Implementation
+```gdscript
+# /src/scripts/utils/object_pool.gd
+class_name ObjectPool
+extends Node
+
+var available_objects: Array[Node] = []
+var scene_to_instantiate: PackedScene
+var active_objects: Array[Node] = []
+
+signal object_spawned(object: Node)
+signal object_returned(object: Node)
+
+func initialize(scene: PackedScene, initial_size: int) -> void:
+    scene_to_instantiate = scene
+    for i in initial_size:
+        var instance = scene.instantiate()
+        add_child(instance)
+        instance.visible = false
+        available_objects.push_back(instance)
+
+func get_object() -> Node:
+    var object: Node
+    if available_objects.is_empty():
+        object = scene_to_instantiate.instantiate()
+        add_child(object)
+    else:
+        object = available_objects.pop_back()
+    
+    object.visible = true
+    active_objects.push_back(object)
+    object_spawned.emit(object)
+    return object
+
+func return_object(object: Node) -> void:
+    if not object:
+        return
+        
+    object.visible = false
+    active_objects.erase(object)
+    available_objects.push_back(object)
+    object_returned.emit(object)
+
+func get_active_count() -> int:
+    return active_objects.size()
+```
+
+## 5. SaveManager Singleton
+```gdscript
+# /src/autoload/save_manager.gd
+extends Node
+
+signal save_completed
+signal load_completed
+signal save_failed(error: String)
+
+const SAVE_DIR = "user://saves/"
+const META_SAVE = "user://meta.save"
+
+func _ready() -> void:
+    _ensure_save_directory()
+
+func _ensure_save_directory() -> void:
+    if not DirAccess.dir_exists_absolute(SAVE_DIR):
+        DirAccess.make_dir_absolute(SAVE_DIR)
+
+func save_game(slot: int = 0) -> void:
+    var save_data = {
+        "meta": _get_meta_data(),
+        "player": _get_player_data(),
+        "world": _get_world_data(),
+        "timestamp": Time.get_unix_time_from_system()
+    }
+    
+    var save_path = SAVE_DIR + "save_%d.save" % slot
+    var save_game = FileAccess.open(save_path, FileAccess.WRITE)
+    
+    if save_game:
+        save_game.store_line(JSON.stringify(save_data))
+        save_completed.emit()
+    else:
+        save_failed.emit("Could not open save file")
+
+func load_game(slot: int = 0) -> void:
+    var save_path = SAVE_DIR + "save_%d.save" % slot
+    if not FileAccess.file_exists(save_path):
+        save_failed.emit("Save file not found")
+        return
+        
+    var save_game = FileAccess.open(save_path, FileAccess.READ)
+    var save_data = JSON.parse_string(save_game.get_line())
+    
+    _apply_save_data(save_data)
+    load_completed.emit()
+
+func _get_meta_data() -> Dictionary:
+    return {
+        "version": ProjectSettings.get_setting("application/config/version"),
+        "playtime": Time.get_unix_time_from_system(),
+        "achievements": _get_achievements_data()
+    }
+
+func _get_player_data() -> Dictionary:
+    var player = get_tree().get_first_node_in_group("players")
+    if not player:
+        return {}
+    return player.save()
+
+func _get_world_data() -> Dictionary:
+    var world = get_tree().current_scene
+    if not world:
+        return {}
+    return world.save()
+
+func _apply_save_data(data: Dictionary) -> void:
+    # Implementation for loading save data
+    pass
+```
+
+## 6. Performance Monitor
+```gdscript
+# /src/autoload/performance_monitor.gd
+extends Node
+
+var metrics = {
+    "fps": 0,
+    "draw_calls": 0,
+    "objects": 0,
+    "nodes": 0,
+    "physics_objects": 0
+}
+
+@onready var update_timer: Timer = $UpdateTimer
+
+func _ready() -> void:
+    if not OS.is_debug_build():
+        queue_free()
+        return
+        
+    update_timer = Timer.new()
+    update_timer.wait_time = 1.0
+    update_timer.timeout.connect(_update_metrics)
+    add_child(update_timer)
+    update_timer.start()
+
+func _update_metrics() -> void:
+    metrics.fps = Engine.get_frames_per_second()
+    metrics.draw_calls = Performance.get_monitor(Performance.RENDER_DRAW_CALLS_IN_FRAME)
+    metrics.objects = Performance.get_monitor(Performance.OBJECT_COUNT)
+    metrics.nodes = Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
+    metrics.physics_objects = Performance.get_monitor(Performance.PHYSICS_2D_ACTIVE_OBJECTS)
+    
+    if _should_warn():
+        push_warning("Performance warning: %s" % metrics)
+
+func _should_warn() -> bool:
+    return (
+        metrics.fps < 55 or
+        metrics.draw_calls > 1000 or
+        metrics.physics_objects > 1000
+    )
+```
+
+## Testing Implementation
+
+1. Create test scenes for each core system
+2. Implement unit tests for critical functionality
+3. Create stress tests for object pools
+4. Profile performance under load
+5. Test save/load with corrupted data
+6. Verify proper cleanup and memory management
+
+## Next Steps
+
+1. Implement Player Systems
+2. Set up Comfort Zone base functionality
+3. Create initial enemy types with pooling
+4. Develop resource collection system
+
+Would you like me to continue with the implementation plan for any of these next steps? 

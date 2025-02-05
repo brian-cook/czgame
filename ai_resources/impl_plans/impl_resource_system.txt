@@ -1,0 +1,255 @@
+# Resource System Implementation Plan
+
+## 1. Resource Data
+```gdscript
+# /src/resources/pickups/resource_data.gd
+class_name ResourceData
+extends Resource
+
+@export_group("Basic Info")
+@export var id: String = ""
+@export var name: String = ""
+@export var base_value: float = 1.0
+@export var sprite: Texture2D
+@export var color: Color = Color.WHITE
+
+@export_group("Spawn Settings")
+@export var spawn_weight: float = 1.0
+@export var min_spawn_count: int = 1
+@export var max_spawn_count: int = 3
+@export var spread_radius: float = 30.0
+
+@export_group("Collection Settings")
+@export var collection_effect: PackedScene
+@export var attraction_speed: float = 200.0
+@export var lifetime: float = 30.0
+@export var auto_collect_radius: float = 50.0
+```
+
+## 2. Resource Spawner System
+```gdscript
+# /src/scripts/systems/resource_spawner.gd
+class_name ResourceSpawner
+extends Node
+
+signal resource_spawned(resource: ResourcePickup, position: Vector2)
+signal wave_resources_spawned(count: int)
+
+@export var spawn_radius: float = 500.0
+@export var min_distance_from_player: float = 100.0
+@export var resources_per_wave: int = 20
+@export var zone_avoidance_weight: float = 1.5
+
+var resource_pool: ObjectPool
+var active_resources: Array[ResourcePickup] = []
+var spawn_positions: Array[Vector2] = []
+
+func _ready() -> void:
+    resource_pool = $ResourcePool
+    _initialize_spawn_positions()
+
+func spawn_wave_resources() -> void:
+    var spawned_count = 0
+    var positions = _get_valid_spawn_positions()
+    positions.shuffle()
+    
+    for i in resources_per_wave:
+        if positions.is_empty():
+            break
+            
+        var resource = _spawn_resource(positions.pop_back())
+        if resource:
+            spawned_count += 1
+    
+    wave_resources_spawned.emit(spawned_count)
+
+func _spawn_resource(position: Vector2) -> ResourcePickup:
+    var resource = resource_pool.get_object() as ResourcePickup
+    if not resource:
+        return null
+    
+    resource.global_position = position
+    active_resources.append(resource)
+    resource_spawned.emit(resource, position)
+    return resource
+
+func _get_valid_spawn_positions() -> Array[Vector2]:
+    var valid_positions: Array[Vector2] = []
+    var player = get_tree().get_first_node_in_group("players")
+    var comfort_zones = get_tree().get_nodes_in_group("comfort_zones")
+    
+    for pos in spawn_positions:
+        if _is_valid_spawn_position(pos, player, comfort_zones):
+            valid_positions.append(pos)
+    
+    return valid_positions
+
+func _is_valid_spawn_position(pos: Vector2, player: Node2D, zones: Array) -> bool:
+    if not player:
+        return true
+        
+    # Check player distance
+    if pos.distance_to(player.global_position) < min_distance_from_player:
+        return false
+    
+    # Check zone influence
+    var zone_influence = 0.0
+    for zone in zones:
+        var distance = pos.distance_to(zone.global_position)
+        if distance < zone.zone_radius * 2:
+            zone_influence += 1.0 - (distance / (zone.zone_radius * 2))
+    
+    return zone_influence < zone_avoidance_weight
+```
+
+## 3. Resource Pickup
+```gdscript
+# /src/scripts/pickups/resource_pickup.gd
+class_name ResourcePickup
+extends Area2D
+
+signal collected(value: float)
+signal value_modified(new_value: float)
+
+@export var resource_data: ResourceData
+@export var attraction_component: AttractionComponent
+@export var lifetime_component: LifetimeComponent
+
+var current_value: float
+var base_value: float
+
+func _ready() -> void:
+    if resource_data:
+        setup(resource_data)
+
+func setup(data: ResourceData) -> void:
+    resource_data = data
+    base_value = data.base_value
+    current_value = base_value
+    
+    # Setup components
+    if attraction_component:
+        attraction_component.speed = data.attraction_speed
+        attraction_component.auto_collect_radius = data.auto_collect_radius
+    
+    if lifetime_component:
+        lifetime_component.lifetime = data.lifetime
+
+func modify_value(new_value: float) -> void:
+    current_value = new_value
+    value_modified.emit(current_value)
+
+func get_value() -> float:
+    return current_value
+
+func _on_collected(collector: Node2D) -> void:
+    collected.emit(current_value)
+    EventBus.emit_signal("resource_collected", resource_data.id, current_value)
+    queue_free()
+```
+
+## 4. Attraction Component
+```gdscript
+# /src/scripts/components/attraction_component.gd
+class_name AttractionComponent
+extends Node2D
+
+@export var speed: float = 200.0
+@export var auto_collect_radius: float = 50.0
+@export var acceleration: float = 500.0
+
+var target: Node2D
+var velocity: Vector2 = Vector2.ZERO
+
+func _physics_process(delta: float) -> void:
+    if not is_instance_valid(target):
+        return
+    
+    var direction = target.global_position - get_parent().global_position
+    var distance = direction.length()
+    
+    if distance < auto_collect_radius:
+        _collect()
+    else:
+        _move_to_target(direction.normalized(), delta)
+
+func _move_to_target(direction: Vector2, delta: float) -> void:
+    velocity = velocity.move_toward(
+        direction * speed,
+        acceleration * delta
+    )
+    get_parent().global_position += velocity * delta
+
+func _collect() -> void:
+    if get_parent().has_method("_on_collected"):
+        get_parent()._on_collected(target)
+```
+
+## 5. Resource Manager
+```gdscript
+# /src/autoload/resource_manager.gd
+class_name ResourceManager
+extends Node
+
+var resource_data: Dictionary = {}
+var spawn_weights: Array[Dictionary] = []
+var total_weight: float = 0.0
+
+func _ready() -> void:
+    _load_resources()
+    _calculate_weights()
+
+func _load_resources() -> void:
+    var resource_dir = DirAccess.get_files_at("res://resources/pickups/")
+    for file in resource_dir:
+        if file.ends_with(".tres"):
+            var data = load("res://resources/pickups/" + file) as ResourceData
+            resource_data[data.id] = data
+            spawn_weights.append({"id": data.id, "weight": data.spawn_weight})
+            total_weight += data.spawn_weight
+
+func get_random_resource() -> ResourceData:
+    var roll = randf() * total_weight
+    var current_weight = 0.0
+    
+    for weight_data in spawn_weights:
+        current_weight += weight_data.weight
+        if roll <= current_weight:
+            return resource_data[weight_data.id]
+    
+    return resource_data[spawn_weights[0].id]
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/resource_system_test.tscn
+- Node2D (root)
+  - ResourceSpawner
+  - ComfortZone
+  - TestPlayer
+  - ResourceCollector
+  - PerformanceMonitor
+  - TestUI
+    - ResourceCounter
+    - SpawnDebug
+    - CollectionStats
+```
+
+2. Test scenarios:
+- Wave resource spawning
+- Zone influence on spawning
+- Resource collection mechanics
+- Value modification in zones
+- Performance with many resources
+- Collection effects and feedback
+
+## Next Steps
+
+1. Develop zone placement strategy
+2. Add visual feedback for enemy awareness
+3. Implement sound effects system
+4. Create resource UI system
+
+Would you like me to continue with any of these next steps? 

@@ -1,0 +1,228 @@
+# Zone Upgrade System Implementation Plan
+
+## 1. Zone Upgrade Data Resource
+```gdscript
+# /src/resources/zones/zone_upgrade_data.gd
+class_name ZoneUpgradeData
+extends Resource
+
+@export_group("Basic Info")
+@export var id: String = ""
+@export var name: String = ""
+@export var description: String = ""
+@export var icon: Texture2D
+@export var cost: int = 100
+
+@export_group("Upgrade Settings")
+@export_enum("Size", "Effect", "Duration", "Denial", "Special") var upgrade_type: String
+@export var value_modifier: float = 0.0
+@export var max_level: int = 3
+@export var requirements: Array[String] = []
+
+# Special effect settings
+@export_group("Special Effects")
+@export var effect_scene: PackedScene
+@export var particle_effect: PackedScene
+@export var sound_effect: AudioStream
+
+func can_apply_to(zone: ComfortZone) -> bool:
+    if not zone.upgrade_component:
+        return false
+    
+    var current_level = zone.upgrade_component.get_upgrade_level(id)
+    if current_level >= max_level:
+        return false
+    
+    return _check_requirements(zone)
+
+func _check_requirements(zone: ComfortZone) -> bool:
+    for req in requirements:
+        if not zone.upgrade_component.has_upgrade(req):
+            return false
+    return true
+```
+
+## 2. Zone Upgrade Manager
+```gdscript
+# /src/autoload/zone_upgrade_manager.gd
+class_name ZoneUpgradeManager
+extends Node
+
+signal upgrade_available(zone: ComfortZone, upgrades: Array[ZoneUpgradeData])
+signal upgrade_applied(zone: ComfortZone, upgrade: ZoneUpgradeData)
+
+var available_upgrades: Dictionary = {}
+var upgrade_pools: Dictionary = {} # upgrade_type: Array[ZoneUpgradeData]
+
+func _ready() -> void:
+    _load_upgrades()
+    _initialize_pools()
+
+func _load_upgrades() -> void:
+    var upgrade_dir = DirAccess.get_files_at("res://resources/zones/upgrades/")
+    for file in upgrade_dir:
+        if file.ends_with(".tres"):
+            var upgrade = load("res://resources/zones/upgrades/" + file)
+            available_upgrades[upgrade.id] = upgrade
+            
+            if not upgrade_pools.has(upgrade.upgrade_type):
+                upgrade_pools[upgrade.upgrade_type] = []
+            upgrade_pools[upgrade.upgrade_type].append(upgrade)
+
+func get_available_upgrades(zone: ComfortZone, count: int = 3) -> Array[ZoneUpgradeData]:
+    var valid_upgrades: Array[ZoneUpgradeData] = []
+    
+    for upgrade in available_upgrades.values():
+        if upgrade.can_apply_to(zone):
+            valid_upgrades.append(upgrade)
+    
+    valid_upgrades.shuffle()
+    return valid_upgrades.slice(0, min(count - 1, valid_upgrades.size()))
+```
+
+## 3. Zone Upgrade Component
+```gdscript
+# /src/scripts/zones/components/zone_upgrade_component.gd
+class_name ZoneUpgradeComponent
+extends Node
+
+signal upgrade_applied(upgrade: ZoneUpgradeData)
+signal upgrade_removed(upgrade: ZoneUpgradeData)
+signal level_changed(upgrade_id: String, new_level: int)
+
+var active_upgrades: Dictionary = {} # upgrade_id: level
+var upgrade_effects: Dictionary = {} # upgrade_id: Node
+
+func apply_upgrade(upgrade: ZoneUpgradeData) -> void:
+    var current_level = active_upgrades.get(upgrade.id, 0)
+    if current_level >= upgrade.max_level:
+        return
+    
+    active_upgrades[upgrade.id] = current_level + 1
+    _apply_upgrade_effects(upgrade)
+    
+    upgrade_applied.emit(upgrade)
+    level_changed.emit(upgrade.id, current_level + 1)
+
+func _apply_upgrade_effects(upgrade: ZoneUpgradeData) -> void:
+    var zone = get_parent() as ComfortZone
+    
+    match upgrade.upgrade_type:
+        "Size":
+            zone.zone_radius *= (1.0 + upgrade.value_modifier)
+            zone.update_zone_shape()
+        "Effect":
+            _apply_effect_upgrade(upgrade)
+        "Duration":
+            zone.lifetime += upgrade.value_modifier
+        "Denial":
+            zone.resource_denial_multiplier *= (1.0 + upgrade.value_modifier)
+        "Special":
+            _apply_special_upgrade(upgrade)
+
+func _apply_effect_upgrade(upgrade: ZoneUpgradeData) -> void:
+    if upgrade.effect_scene:
+        var effect = upgrade.effect_scene.instantiate()
+        add_child(effect)
+        upgrade_effects[upgrade.id] = effect
+```
+
+## 4. Zone Upgrade UI
+```gdscript
+# /src/scripts/ui/zone_upgrade_menu.gd
+class_name ZoneUpgradeMenu
+extends Control
+
+signal upgrade_selected(zone: ComfortZone, upgrade: ZoneUpgradeData)
+
+@export var upgrade_card_scene: PackedScene
+@onready var upgrade_container: HBoxContainer = $UpgradeContainer
+@onready var title_label: Label = $TitleLabel
+
+var current_zone: ComfortZone
+
+func show_upgrades(zone: ComfortZone, upgrades: Array[ZoneUpgradeData]) -> void:
+    current_zone = zone
+    title_label.text = "Zone Upgrades"
+    
+    # Clear existing cards
+    for child in upgrade_container.get_children():
+        child.queue_free()
+    
+    # Create new upgrade cards
+    for upgrade in upgrades:
+        var card = upgrade_card_scene.instantiate()
+        upgrade_container.add_child(card)
+        card.setup(upgrade, zone.upgrade_component.get_upgrade_level(upgrade.id))
+        card.upgrade_selected.connect(_on_upgrade_selected)
+    
+    show()
+
+func _on_upgrade_selected(upgrade: ZoneUpgradeData) -> void:
+    upgrade_selected.emit(current_zone, upgrade)
+    hide()
+```
+
+## 5. Zone Upgrade Effects
+```gdscript
+# /src/scripts/zones/effects/zone_effect_base.gd
+class_name ZoneEffectBase
+extends Node
+
+@export var effect_name: String = "Base Effect"
+@export var particle_effect: GPUParticles2D
+@export var sound_effect: AudioStreamPlayer2D
+
+var is_active: bool = false
+
+func activate() -> void:
+    is_active = true
+    if particle_effect:
+        particle_effect.emitting = true
+    if sound_effect:
+        sound_effect.play()
+
+func deactivate() -> void:
+    is_active = false
+    if particle_effect:
+        particle_effect.emitting = false
+    if sound_effect:
+        sound_effect.stop()
+
+func cleanup() -> void:
+    deactivate()
+    queue_free()
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/zone_upgrade_test.tscn
+- Node2D (root)
+  - ComfortZone
+  - TestPlayer
+  - TestEnemies
+  - UpgradeUI
+    - UpgradeMenu
+    - EffectPreview
+    - StatsDisplay
+  - PerformanceMonitor
+```
+
+2. Test scenarios:
+- Upgrade application and stacking
+- Visual effect combinations
+- Performance with multiple effects
+- UI responsiveness
+- Resource cost system
+- Requirement validation
+
+## Next Steps
+
+1. Create resource spawning system
+2. Develop zone placement strategy
+3. Add visual feedback for enemy awareness
+4. Implement sound effects system
+
+Would you like me to continue with any of these next steps? 

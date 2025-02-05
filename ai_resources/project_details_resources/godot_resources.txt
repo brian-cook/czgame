@@ -1,0 +1,390 @@
+# Godot Resources and Best Practices
+
+## 1. Official Documentation
+- Godot Documentation: https://docs.godotengine.org/
+- GDScript Reference: https://docs.godotengine.org/en/stable/tutorials/scripting/gdscript/
+- Best Practices: https://docs.godotengine.org/en/stable/tutorials/best_practices/
+
+## 2. Performance Optimization
+### Node Usage
+- Use Area2D for trigger zones
+- Use StaticBody2D for immobile objects
+- Use CharacterBody2D for players/enemies
+- Use Node2D for organization
+- Use Markers for positions
+- Use RayCast2D for line of sight
+
+### Scene Organization
+- Keep scenes modular
+- Instance packed scenes
+- Use node groups sparingly
+- Implement proper scene cleanup
+- Use SceneTree notifications
+
+### Memory Management
+- Object pooling for frequent spawning/despawning
+- Free resources when not needed
+- Use queue_free() instead of free()
+- Clear arrays/dictionaries when emptying
+- Monitor memory usage with Performance singleton
+
+## 3. Useful Design Patterns
+### Singleton (Autoload)
+
+gdscript
+game_manager.gd
+extends Node
+var score: int = 0
+signal score_changed(new_score: int)
+func add_score(value: int) -> void:
+score += value
+score_changed.emit(score)
+
+### State Machine
+```gdscript
+# state_machine.gd
+extends Node
+
+var current_state: State
+var states: Dictionary = {}
+
+func change_state(new_state_name: String) -> void:
+    if current_state:
+        current_state.exit()
+    current_state = states[new_state_name]
+    current_state.enter()
+```
+
+### Observer (Signals)
+```gdscript
+# player.gd
+signal health_changed(new_health: float)
+signal died
+
+# ui.gd
+func _ready() -> void:
+    player.health_changed.connect(_on_player_health_changed)
+    player.died.connect(_on_player_died)
+```
+
+## 4. Essential Resources
+
+### Learning Resources
+- GDQuest: https://www.gdquest.com/
+- KidsCanCode: https://kidscancode.org/godot_recipes/
+- HeartBeast: https://www.youtube.com/@uheartbeast
+- Game Development Center: https://www.youtube.com/@GameDevelopmentCenter
+
+### Asset Resources
+- Kenney Assets: https://www.kenney.nl/assets
+- OpenGameArt: https://opengameart.org/
+- Itch.io: https://itch.io/game-assets
+
+### Tools
+- Aseprite (Pixel Art): https://www.aseprite.org/
+- Krita (Digital Painting): https://krita.org/
+- LMMS (Music): https://lmms.io/
+- Audacity (Sound Effects): https://www.audacityteam.org/
+
+## 5. Common Godot Patterns
+
+### Signal Connection
+```gdscript
+# Prefer this:
+enemy.died.connect(_on_enemy_died)
+
+# Over this:
+enemy.connect("died", _on_enemy_died)
+```
+
+### Export Variables
+```gdscript
+@export var speed: float = 100.0
+@export_range(0.0, 100.0) var health: float = 100.0
+@export_enum("Idle", "Walk", "Run") var state: int = 0
+```
+
+### Resource Loading
+```gdscript
+# Prefer this:
+@onready var sprite_texture = preload("res://assets/sprites/player.png")
+
+# Over this:
+var sprite_texture = load("res://assets/sprites/player.png")
+```
+
+## 6. Debugging Tips
+- Use print_debug() for debug messages
+- Enable "Visible Collision Shapes" in debug
+- Use Remote Scene Tree
+- Use Performance Monitoring
+- Implement debug commands
+
+## 7. Project Organization Tips
+- Use version control (Git)
+- Keep assets organized by type
+- Use consistent naming conventions
+- Document your code
+- Create reusable components
+
+## 8. Common Pitfalls to Avoid
+- Don't use physics process for non-physics updates
+- Avoid deep node trees
+- Don't instance nodes in tight loops
+- Be careful with autoloads (singletons)
+- Watch for memory leaks in signals
+
+## 9. Testing
+- Create test scenes
+- Use assert() for validation
+- Test edge cases
+- Profile performance
+- Document test procedures
+
+## 10. Community Resources
+- Godot Forums: https://godotforums.org/
+- Godot Discord: https://discord.gg/4JBkykG
+- Reddit: https://www.reddit.com/r/godot/
+- GitHub: https://github.com/godotengine/godot
+
+### Player Implementation [NEXT]
+1. Create Base Player Scene
+```gdscript
+# /src/scenes/player/player.tscn structure
+- CharacterBody2D (root)
+  - Sprite2D (player_sprite)
+  - CollisionShape2D (collision)
+  - Camera2D (follow_camera)
+  - WeaponMount (Node2D)
+  - HealthComponent
+  - HurtboxComponent
+```
+
+2. Player Controller Script
+```gdscript
+# /src/scripts/player/player_controller.gd
+class_name PlayerController
+extends CharacterBody2D
+
+@export var move_speed: float = 300.0
+@export var acceleration: float = 2000.0
+@export var friction: float = 1000.0
+
+@onready var sprite: Sprite2D = $Sprite2D
+@onready var weapon_mount: Node2D = $WeaponMount
+@onready var health_component: HealthComponent = $HealthComponent
+
+func _physics_process(delta: float) -> void:
+    var input_vector = Vector2(
+        Input.get_axis("move_left", "move_right"),
+        Input.get_axis("move_up", "move_down")
+    ).normalized()
+    
+    if input_vector != Vector2.ZERO:
+        velocity = velocity.move_toward(input_vector * move_speed, acceleration * delta)
+    else:
+        velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
+    
+    move_and_slide()
+    _update_weapon_rotation()
+
+func _update_weapon_rotation() -> void:
+    weapon_mount.look_at(get_global_mouse_position())
+```
+
+3. Health Component
+```gdscript
+# /src/scripts/components/health_component.gd
+class_name HealthComponent
+extends Node
+
+signal health_changed(new_health: float, max_health: float)
+signal died
+
+@export var max_health: float = 100.0
+var current_health: float
+
+func _ready() -> void:
+    current_health = max_health
+
+func take_damage(amount: float) -> void:
+    current_health = max(0, current_health - amount)
+    health_changed.emit(current_health, max_health)
+    
+    if current_health <= 0:
+        died.emit()
+```
+
+4. Test Scene Setup
+```gdscript
+# /src/tests/player_test.tscn
+- Node2D (root)
+  - PlayerController (player instance)
+  - PerformanceMonitor
+  - TestUI
+    - HealthBar
+    - FPSCounter
+```
+
+### Next Implementation Steps:
+1. Basic Weapon System
+```gdscript
+# /src/scripts/weapons/weapon_base.gd
+class_name WeaponBase
+extends Node2D
+
+@export var fire_rate: float = 1.0
+@export var damage: float = 10.0
+@export var projectile_scene: PackedScene
+
+var can_fire: bool = true
+@onready var fire_timer: Timer = $FireTimer
+
+func _ready() -> void:
+    fire_timer.wait_time = 1.0 / fire_rate
+    fire_timer.timeout.connect(_on_fire_timer_timeout)
+
+func _physics_process(_delta: float) -> void:
+    if can_fire:
+        fire()
+
+func fire() -> void:
+    can_fire = false
+    fire_timer.start()
+    _spawn_projectile()
+
+func _spawn_projectile() -> void:
+    var projectile = projectile_scene.instantiate()
+    # Implementation continues...
+```
+### Weapon System Implementation [IN PROGRESS]
+1. Projectile Base
+```gdscript
+# /src/scripts/weapons/projectile_base.gd
+class_name ProjectileBase
+extends Area2D
+
+@export var speed: float = 800.0
+@export var damage: float = 10.0
+@export var lifetime: float = 2.0
+@export var pierce_count: int = 1
+
+var direction: Vector2
+var source: Node2D
+var pierced_targets: Array[Node] = []
+
+func _ready() -> void:
+    # Auto-destroy after lifetime
+    await get_tree().create_timer(lifetime).timeout
+    queue_free()
+
+func _physics_process(delta: float) -> void:
+    position += direction * speed * delta
+
+func _on_area_entered(area: Area2D) -> void:
+    if area.is_in_group("hurtbox") and area.owner != source:
+        if area.owner not in pierced_targets:
+            _handle_collision(area)
+
+func _handle_collision(area: Area2D) -> void:
+    if area.owner.has_method("take_damage"):
+        area.owner.take_damage(damage)
+        
+    pierced_targets.append(area.owner)
+    if pierced_targets.size() >= pierce_count:
+        queue_free()
+```
+
+2. Complete Weapon Base
+```gdscript
+# /src/scripts/weapons/weapon_base.gd (continued)
+class_name WeaponBase
+extends Node2D
+
+# ... previous code ...
+
+func _spawn_projectile() -> void:
+    var projectile: ProjectileBase = projectile_scene.instantiate()
+    get_tree().current_scene.add_child(projectile)
+    projectile.global_position = global_position
+    projectile.direction = Vector2.RIGHT.rotated(global_rotation)
+    projectile.source = owner
+    
+    EventBus.weapon_fired.emit(self, global_position)
+
+func _on_fire_timer_timeout() -> void:
+    can_fire = true
+```
+
+3. Basic Weapon: Auto Gun
+```gdscript
+# /src/scripts/weapons/auto_gun.gd
+class_name AutoGun
+extends WeaponBase
+
+@export var spread_angle: float = 5.0
+@export var projectiles_per_shot: int = 1
+
+func _spawn_projectile() -> void:
+    for i in projectiles_per_shot:
+        var projectile: ProjectileBase = projectile_scene.instantiate()
+        get_tree().current_scene.add_child(projectile)
+        
+        var spread = randf_range(-spread_angle, spread_angle)
+        projectile.global_position = global_position
+        projectile.direction = Vector2.RIGHT.rotated(global_rotation + deg_to_rad(spread))
+        projectile.source = owner
+    
+    EventBus.weapon_fired.emit(self, global_position)
+```
+
+4. Weapon Resources
+```gdscript
+# /src/resources/weapons/weapon_data.gd
+class_name WeaponData
+extends Resource
+
+@export var name: String = "Weapon"
+@export var description: String = ""
+@export var icon: Texture2D
+@export var scene: PackedScene
+@export var fire_rate: float = 1.0
+@export var damage: float = 10.0
+@export var projectile_speed: float = 800.0
+@export var pierce_count: int = 1
+```
+
+5. Test Scene Update
+```gdscript
+# /src/tests/weapon_test.tscn
+- Node2D (root)
+  - PlayerController
+    - AutoGun (weapon_mount/auto_gun)
+  - TestTargets
+    - Target1
+    - Target2
+  - PerformanceMonitor
+  - TestUI
+    - WeaponStats
+    - DamageNumbers
+```
+
+### Next Implementation Steps:
+1. Weapon Effects System
+```gdscript
+# /src/scripts/weapons/weapon_effects.gd
+class_name WeaponEffects
+extends Node2D
+
+@export var muzzle_flash_scene: PackedScene
+@export var impact_effect_scene: PackedScene
+@export var trail_scene: PackedScene
+
+var effect_pool: EffectManager
+
+func _ready() -> void:
+    effect_pool = get_node("/root/EffectManager")
+    # Implementation continues...
+```
+
+

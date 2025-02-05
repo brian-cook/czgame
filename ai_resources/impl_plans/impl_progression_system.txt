@@ -1,0 +1,194 @@
+# Progression System Implementation Plan
+
+## 1. Progression Data Resource
+```gdscript
+# /src/resources/progression/progression_data.gd
+class_name ProgressionData
+extends Resource
+
+@export_group("Level Settings")
+@export var max_level: int = 30
+@export var experience_curve: Curve
+@export var base_experience_required: int = 100
+
+@export_group("Reward Settings")
+@export var upgrades_per_level: int = 3
+@export var guaranteed_weapon_levels: Array[int] = [5, 10, 15, 20, 25]
+@export var special_reward_levels: Array[int] = [10, 20, 30]
+
+@export_group("Performance")
+@export var max_active_upgrades: int = 20  # Performance limit
+@export var effect_pool_size: int = 10     # Memory optimization
+```
+
+## 2. Level Manager
+```gdscript
+# /src/scripts/progression/level_manager.gd
+class_name LevelManager
+extends Node
+
+signal level_up(new_level: int)
+signal experience_gained(amount: int, total: int)
+signal upgrade_available(upgrades: Array)
+
+@export var progression_data: ProgressionData
+@export var update_frequency: int = 2  # Performance optimization
+
+var current_level: int = 1
+var current_experience: int = 0
+var required_experience: int = 100
+var update_counter: int = 0
+
+func _physics_process(_delta: float) -> void:
+    update_counter += 1
+    if update_counter >= update_frequency:
+        update_counter = 0
+        _check_level_up()
+
+func add_experience(amount: int) -> void:
+    current_experience += amount
+    experience_gained.emit(amount, current_experience)
+    
+    # Optimization: Only check level up if close to requirement
+    if current_experience >= required_experience * 0.9:
+        _check_level_up()
+
+func _check_level_up() -> void:
+    while current_experience >= required_experience:
+        _level_up()
+```
+
+## 3. Upgrade Selection System
+```gdscript
+# /src/scripts/progression/upgrade_selection.gd
+class_name UpgradeSelectionSystem
+extends Node
+
+signal upgrades_generated(upgrades: Array)
+signal upgrade_selected(upgrade: UpgradeData)
+
+@export var min_upgrade_quality: float = 0.5
+@export var quality_increase_rate: float = 0.05
+@export var max_choices: int = 3
+
+var available_upgrades: Array[UpgradeData] = []
+var selected_upgrades: Dictionary = {}  # type: count
+var upgrade_weights: Dictionary = {}    # type: weight
+
+func generate_upgrades(level: int) -> Array[UpgradeData]:
+    var upgrades: Array[UpgradeData] = []
+    var quality = min_upgrade_quality + (level * quality_increase_rate)
+    
+    # Generate weighted upgrade options
+    for i in max_choices:
+        var upgrade = _generate_weighted_upgrade(quality)
+        if upgrade:
+            upgrades.append(upgrade)
+    
+    available_upgrades = upgrades
+    upgrades_generated.emit(upgrades)
+    return upgrades
+```
+
+## 4. Upgrade Application System
+```gdscript
+# /src/scripts/progression/upgrade_application.gd
+class_name UpgradeApplicationSystem
+extends Node
+
+signal upgrade_applied(upgrade: UpgradeData)
+signal stats_updated(stats: Dictionary)
+
+@export var max_stat_value: float = 5.0  # Balance limit
+@export var effect_component: EffectComponent
+
+var active_upgrades: Dictionary = {}  # type: Array[UpgradeData]
+var stat_modifiers: Dictionary = {}   # stat: value
+
+func apply_upgrade(upgrade: UpgradeData) -> void:
+    if not _validate_upgrade(upgrade):
+        return
+        
+    # Apply upgrade effects
+    match upgrade.type:
+        "stat":
+            _apply_stat_upgrade(upgrade)
+        "ability":
+            _apply_ability_upgrade(upgrade)
+        "weapon":
+            _apply_weapon_upgrade(upgrade)
+    
+    # Track upgrade
+    if not active_upgrades.has(upgrade.type):
+        active_upgrades[upgrade.type] = []
+    active_upgrades[upgrade.type].append(upgrade)
+    
+    # Visual feedback
+    effect_component.play_upgrade_effect(upgrade)
+    upgrade_applied.emit(upgrade)
+```
+
+## 5. Progress Save System
+```gdscript
+# /src/scripts/progression/progress_save.gd
+class_name ProgressSaveSystem
+extends Node
+
+signal progress_saved
+signal progress_loaded
+
+var save_data: Dictionary = {
+    "level": 1,
+    "experience": 0,
+    "upgrades": {},
+    "stats": {},
+    "unlocks": []
+}
+
+func save_progress() -> void:
+    var file = FileAccess.open("user://progress.save", FileAccess.WRITE)
+    if file:
+        save_data.level = LevelManager.current_level
+        save_data.experience = LevelManager.current_experience
+        save_data.upgrades = _serialize_upgrades()
+        save_data.stats = _serialize_stats()
+        
+        file.store_var(save_data)
+        progress_saved.emit()
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/progression_test.tscn
+- Node2D (root)
+  - LevelManager
+  - UpgradeSystem
+    - SelectionUI
+    - EffectSystem
+  - TestPlayer
+  - PerformanceMonitor
+  - TestUI
+    - ExperienceBar
+    - LevelDisplay
+    - UpgradeList
+```
+
+2. Test scenarios:
+- Experience gain
+- Level up flow
+- Upgrade selection
+- Stat modifications
+- Save/load system
+- Performance impact
+- Memory management
+
+## Next Steps
+
+1. Implement meta progression
+2. Add achievement system
+3. Create save/load system
+4. Add accessibility options
+
+Would you like me to continue with the meta progression system next? 

@@ -1,0 +1,231 @@
+# Enemy AI Zone Interaction Implementation Plan
+
+## 1. Enemy Zone Awareness Component
+```gdscript
+# /src/scripts/enemies/components/zone_awareness_component.gd
+class_name ZoneAwarenessComponent
+extends Node
+
+signal zone_detected(zone: ComfortZone)
+signal zone_awareness_changed(awareness_level: float)
+
+@export_group("Awareness Settings")
+@export var detection_radius: float = 300.0
+@export var awareness_buildup_rate: float = 1.0
+@export var awareness_decay_rate: float = 0.5
+@export var update_frequency: int = 3
+
+var nearby_zones: Array[ComfortZone] = []
+var zone_awareness: Dictionary = {} # zone: awareness_level
+var cached_paths: Dictionary = {} # zone: PathData
+var path_update_timer: float = 0.0
+
+func _physics_process(delta: float) -> void:
+    if Engine.get_frames_drawn() % update_frequency != 0:
+        return
+    
+    _update_zone_awareness(delta)
+    _update_cached_paths(delta)
+
+func _update_zone_awareness(delta: float) -> void:
+    var parent = get_parent()
+    
+    # Update awareness levels for each zone
+    for zone in nearby_zones:
+        if not is_instance_valid(zone):
+            nearby_zones.erase(zone)
+            zone_awareness.erase(zone)
+            cached_paths.erase(zone)
+            continue
+        
+        var distance = parent.global_position.distance_to(zone.global_position)
+        var awareness = zone_awareness.get(zone, 0.0)
+        
+        if distance <= detection_radius:
+            awareness = min(1.0, awareness + awareness_buildup_rate * delta)
+        else:
+            awareness = max(0.0, awareness - awareness_decay_rate * delta)
+        
+        zone_awareness[zone] = awareness
+        zone_awareness_changed.emit(awareness)
+
+func _update_cached_paths(delta: float) -> void:
+    path_update_timer -= delta
+    if path_update_timer <= 0:
+        path_update_timer = 1.0 # Update paths every second
+        for zone in nearby_zones:
+            if is_instance_valid(zone):
+                _calculate_avoidance_path(zone)
+```
+
+## 2. Enemy AI State Machine
+```gdscript
+# /src/scripts/enemies/enemy_state_machine.gd
+class_name EnemyStateMachine
+extends Node
+
+enum State { IDLE, CHASE, AVOID_ZONE, ATTACK, STUNNED }
+
+signal state_changed(new_state: State)
+
+var current_state: State = State.IDLE
+var enemy: EnemyBase
+var zone_awareness: ZoneAwarenessComponent
+
+func _ready() -> void:
+    enemy = get_parent() as EnemyBase
+    zone_awareness = $ZoneAwarenessComponent
+    zone_awareness.zone_awareness_changed.connect(_on_zone_awareness_changed)
+
+func _physics_process(delta: float) -> void:
+    match current_state:
+        State.IDLE:
+            _handle_idle_state(delta)
+        State.CHASE:
+            _handle_chase_state(delta)
+        State.AVOID_ZONE:
+            _handle_avoid_zone_state(delta)
+        State.ATTACK:
+            _handle_attack_state(delta)
+        State.STUNNED:
+            _handle_stunned_state(delta)
+
+func _handle_avoid_zone_state(delta: float) -> void:
+    var avoidance_vector = _calculate_zone_avoidance()
+    var target_vector = _get_target_direction()
+    
+    # Blend between avoidance and target direction based on zone awareness
+    var max_awareness = 0.0
+    for awareness in zone_awareness.zone_awareness.values():
+        max_awareness = max(max_awareness, awareness)
+    
+    var final_direction = avoidance_vector.lerp(target_vector, 1.0 - max_awareness)
+    enemy.move_in_direction(final_direction, delta)
+```
+
+## 3. Enemy Pathfinding with Zones
+```gdscript
+# /src/scripts/enemies/enemy_pathfinding.gd
+class_name EnemyPathfinding
+extends Node
+
+@export var path_update_frequency: float = 1.0
+@export var zone_weight: float = 2.0
+@export var path_simplification: float = 5.0
+
+var navigation_agent: NavigationAgent2D
+var current_path: Array[Vector2] = []
+var path_timer: float = 0.0
+
+func _ready() -> void:
+    navigation_agent = $NavigationAgent2D
+    navigation_agent.path_desired_distance = path_simplification
+    navigation_agent.target_desired_distance = path_simplification
+
+func _physics_process(delta: float) -> void:
+    path_timer -= delta
+    if path_timer <= 0:
+        path_timer = path_update_frequency
+        _update_path()
+
+func _update_path() -> void:
+    var target = get_parent().get_target_position()
+    if not target:
+        return
+    
+    # Apply zone avoidance to pathfinding
+    var zone_awareness = get_parent().get_node("ZoneAwarenessComponent")
+    var modified_target = _adjust_target_for_zones(target, zone_awareness)
+    
+    navigation_agent.target_position = modified_target
+
+func _adjust_target_for_zones(target: Vector2, awareness: ZoneAwarenessComponent) -> Vector2:
+    var adjusted = target
+    for zone in awareness.nearby_zones:
+        if not is_instance_valid(zone):
+            continue
+            
+        var zone_influence = awareness.zone_awareness[zone]
+        if zone_influence > 0:
+            var to_zone = zone.global_position - get_parent().global_position
+            adjusted -= to_zone.normalized() * zone_influence * zone_weight
+    
+    return adjusted
+```
+
+## 4. Enemy Group Behavior with Zones
+```gdscript
+# /src/scripts/enemies/enemy_group_behavior.gd
+class_name EnemyGroupBehavior
+extends Node
+
+@export var group_radius: float = 200.0
+@export var separation_weight: float = 1.0
+@export var cohesion_weight: float = 0.5
+@export var update_frequency: int = 5
+
+var nearby_enemies: Array[EnemyBase] = []
+var group_center: Vector2
+var update_timer: float = 0.0
+
+func _physics_process(delta: float) -> void:
+    update_timer -= delta
+    if update_timer <= 0:
+        update_timer = 1.0 / update_frequency
+        _update_group_behavior()
+
+func _update_group_behavior() -> void:
+    _find_nearby_enemies()
+    if nearby_enemies.is_empty():
+        return
+    
+    _calculate_group_center()
+    var separation = _calculate_separation()
+    var cohesion = _calculate_cohesion()
+    
+    # Adjust behavior based on zones
+    var zone_awareness = get_parent().get_node("ZoneAwarenessComponent")
+    var zone_influence = _calculate_zone_influence(zone_awareness)
+    
+    var final_direction = (separation * separation_weight + 
+                          cohesion * cohesion_weight +
+                          zone_influence).normalized()
+    
+    get_parent().adjust_movement(final_direction)
+```
+
+## 5. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/enemy_zone_interaction_test.tscn
+- Node2D (root)
+  - ComfortZone
+  - EnemySpawner
+    - BasicEnemy
+    - RangedEnemy
+    - EliteEnemy
+  - NavigationRegion2D
+  - PerformanceMonitor
+  - TestUI
+    - EnemyStateDisplay
+    - ZoneAwarenessDisplay
+    - PathfindingDebug
+```
+
+2. Test scenarios:
+- Zone awareness buildup/decay
+- Pathfinding around zones
+- Group behavior near zones
+- Performance with many enemies
+- AI state transitions
+- Navigation mesh updates
+
+## Next Steps
+
+1. Implement zone upgrade system
+2. Create resource spawning system
+3. Develop zone placement strategy
+4. Add visual feedback for enemy awareness
+
+Would you like me to continue with any of these next steps? 

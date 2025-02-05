@@ -1,0 +1,244 @@
+# Tutorial System Implementation Plan
+
+## 1. Tutorial Manager Singleton
+```gdscript
+# /src/autoload/tutorial_manager.gd
+class_name TutorialManager
+extends Node
+
+signal tutorial_started(tutorial_id: String)
+signal tutorial_completed(tutorial_id: String)
+signal step_started(step_id: String)
+signal step_completed(step_id: String)
+
+var active_tutorial: TutorialSequence
+var completed_tutorials: Array[String] = []
+var is_tutorial_active: bool = false
+
+func _ready() -> void:
+    _load_tutorial_progress()
+    _connect_signals()
+
+func start_tutorial(tutorial_id: String) -> void:
+    if is_tutorial_active or tutorial_id in completed_tutorials:
+        return
+        
+    var tutorial = _load_tutorial(tutorial_id)
+    if tutorial:
+        active_tutorial = tutorial
+        is_tutorial_active = true
+        tutorial_started.emit(tutorial_id)
+        active_tutorial.start()
+
+func _load_tutorial(tutorial_id: String) -> TutorialSequence:
+    var path = "res://resources/tutorials/%s.tres" % tutorial_id
+    return load(path) if ResourceLoader.exists(path) else null
+```
+
+## 2. Tutorial Sequence Resource
+```gdscript
+# /src/resources/tutorials/tutorial_sequence.gd
+class_name TutorialSequence
+extends Resource
+
+@export var tutorial_id: String = ""
+@export var title: String = ""
+@export var description: String = ""
+@export var steps: Array[TutorialStep] = []
+@export var required_tutorials: Array[String] = []
+
+var current_step_index: int = -1
+var is_completed: bool = false
+
+func start() -> void:
+    current_step_index = -1
+    advance_step()
+
+func advance_step() -> void:
+    current_step_index += 1
+    if current_step_index >= steps.size():
+        complete_tutorial()
+        return
+    
+    var step = steps[current_step_index]
+    step.start()
+    TutorialManager.step_started.emit(step.step_id)
+
+func complete_tutorial() -> void:
+    is_completed = true
+    TutorialManager.tutorial_completed.emit(tutorial_id)
+```
+
+## 3. Tutorial Step System
+```gdscript
+# /src/scripts/tutorial/tutorial_step.gd
+class_name TutorialStep
+extends Resource
+
+@export var step_id: String = ""
+@export var instruction_text: String = ""
+@export var highlight_target: NodePath
+@export var completion_condition: CompletionCondition
+@export var timeout_duration: float = 0.0
+@export var can_skip: bool = false
+
+var is_active: bool = false
+var completion_timer: Timer
+
+func start() -> void:
+    is_active = true
+    _setup_completion_condition()
+    _show_instruction()
+    
+    if timeout_duration > 0:
+        _start_timeout_timer()
+
+func _setup_completion_condition() -> void:
+    match completion_condition.type:
+        "ACTION":
+            EventBus.connect(completion_condition.action, _check_completion)
+        "STATE":
+            # Check state periodically
+            completion_timer = Timer.new()
+            completion_timer.timeout.connect(_check_state)
+            completion_timer.start(0.5)
+
+func _check_completion() -> void:
+    if completion_condition.is_satisfied():
+        complete_step()
+
+func complete_step() -> void:
+    is_active = false
+    _cleanup()
+    TutorialManager.step_completed.emit(step_id)
+```
+
+## 4. Tutorial UI System
+```gdscript
+# /src/scripts/ui/tutorial_ui.gd
+class_name TutorialUI
+extends Control
+
+@export var instruction_panel: Panel
+@export var instruction_label: Label
+@export var highlight_effect: ShaderMaterial
+@export var tween_duration: float = 0.3
+
+var current_highlight: Node
+var original_materials: Dictionary = {}
+
+func show_instruction(text: String, target: Node = null) -> void:
+    instruction_label.text = text
+    
+    if target:
+        _highlight_target(target)
+    
+    # Animate panel
+    var tween = create_tween()
+    tween.tween_property(instruction_panel, "modulate:a", 1.0, tween_duration)
+
+func _highlight_target(target: Node) -> void:
+    if current_highlight:
+        _remove_highlight(current_highlight)
+    
+    current_highlight = target
+    if target is CanvasItem:
+        original_materials[target] = target.material
+        target.material = highlight_effect
+    
+    # Ensure highlight is visible
+    _ensure_target_visible(target)
+
+func _ensure_target_visible(target: Node) -> void:
+    if target is Control:
+        # Scroll if needed
+        if target.get_parent() is ScrollContainer:
+            var scroll = target.get_parent() as ScrollContainer
+            scroll.ensure_control_visible(target)
+```
+
+## 5. Completion Condition System
+```gdscript
+# /src/scripts/tutorial/completion_condition.gd
+class_name CompletionCondition
+extends Resource
+
+@export var type: String = "ACTION"  # ACTION or STATE
+@export var action: String = ""      # Event name for ACTION type
+@export var state_check: Callable    # Function for STATE type
+@export var parameters: Dictionary = {}
+
+func is_satisfied() -> bool:
+    match type:
+        "ACTION":
+            return true  # Action events auto-complete
+        "STATE":
+            return state_check.call(parameters)
+    return false
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/tutorial_test.tscn
+- Node2D (root)
+  - TutorialManager
+  - TestPlayer
+  - TestZone
+  - TestEnemies
+  - TutorialUI
+    - InstructionPanel
+    - HighlightLayer
+  - PerformanceMonitor
+```
+
+2. Test scenarios:
+- Tutorial sequence flow
+- Highlight system
+- Instruction visibility
+- Completion conditions
+- Skip functionality
+- State persistence
+- Performance impact
+
+## Example Tutorial Sequence
+```gdscript
+# /src/resources/tutorials/comfort_zone_tutorial.tres
+@export var steps = [
+    TutorialStep.new({
+        step_id = "move_intro",
+        instruction_text = "Use WASD to move",
+        completion_condition = CompletionCondition.new({
+            type = "ACTION",
+            action = "player_moved"
+        })
+    }),
+    TutorialStep.new({
+        step_id = "place_zone",
+        instruction_text = "Left click to place a comfort zone",
+        highlight_target = ^"../UI/ZonePlacementButton",
+        completion_condition = CompletionCondition.new({
+            type = "ACTION",
+            action = "zone_placed"
+        })
+    }),
+    TutorialStep.new({
+        step_id = "collect_resources",
+        instruction_text = "Collect resources outside the zone",
+        completion_condition = CompletionCondition.new({
+            type = "STATE",
+            state_check = func(params): return ResourceManager.collected_count >= 3
+        })
+    })
+]
+```
+
+## Next Steps
+
+1. Add screen shake effects
+2. Implement achievement system
+3. Create save/load system
+4. Add accessibility options
+
+Would you like me to continue with any of these next steps? 

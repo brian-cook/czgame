@@ -1,0 +1,189 @@
+# Meta Progression System Implementation Plan
+
+## 1. Meta Progress Data
+```gdscript
+# /src/resources/meta/meta_progress_data.gd
+class_name MetaProgressData
+extends Resource
+
+@export_group("Currency Settings")
+@export var currency_types: Array[String] = ["souls", "crystals"]
+@export var starting_currency: Dictionary = {"souls": 0, "crystals": 0}
+@export var max_currency: Dictionary = {"souls": 999999, "crystals": 9999}
+
+@export_group("Unlock Settings")
+@export var unlock_categories: Array[String] = ["weapons", "abilities", "perks"]
+@export var max_unlocks_per_category: int = 20
+
+@export_group("Performance")
+@export var max_active_perks: int = 10  # Performance limit
+@export var effect_pool_size: int = 5   # Memory optimization
+```
+
+## 2. Meta Progress Manager
+```gdscript
+# /src/scripts/meta/meta_progress_manager.gd
+class_name MetaProgressManager
+extends Node
+
+signal currency_changed(type: String, amount: int)
+signal unlock_purchased(category: String, item_id: String)
+signal perk_activated(perk: PerkData)
+
+var currencies: Dictionary = {}
+var unlocks: Dictionary = {}
+var active_perks: Array[PerkData] = []
+
+func _ready() -> void:
+    _initialize_currencies()
+    _load_progress()
+    _apply_active_perks()
+
+func add_currency(type: String, amount: int) -> void:
+    if not currencies.has(type):
+        return
+        
+    var new_amount = min(
+        currencies[type] + amount,
+        MetaProgressData.max_currency[type]
+    )
+    currencies[type] = new_amount
+    currency_changed.emit(type, new_amount)
+    _save_progress()
+```
+
+## 3. Unlock System
+```gdscript
+# /src/scripts/meta/unlock_system.gd
+class_name UnlockSystem
+extends Node
+
+signal unlock_available(item: UnlockData)
+signal unlock_completed(item: UnlockData)
+
+@export var unlock_effect_scene: PackedScene
+@export var max_pending_unlocks: int = 5  # Performance optimization
+
+var available_unlocks: Dictionary = {}  # category: Array[UnlockData]
+var completed_unlocks: Array[String] = []
+var effect_pool: ObjectPool
+
+func _ready() -> void:
+    _initialize_effect_pool()
+    _load_unlocks()
+
+func purchase_unlock(unlock_id: String) -> bool:
+    var unlock = available_unlocks.get(unlock_id)
+    if not unlock or not _can_afford(unlock):
+        return false
+    
+    _deduct_currency(unlock.cost)
+    _apply_unlock(unlock)
+    completed_unlocks.append(unlock_id)
+    
+    # Visual feedback with pooled effect
+    var effect = effect_pool.get_object()
+    if effect:
+        effect.play_unlock_effect(unlock)
+    
+    unlock_completed.emit(unlock)
+    return true
+```
+
+## 4. Perk System
+```gdscript
+# /src/scripts/meta/perk_system.gd
+class_name PerkSystem
+extends Node
+
+signal perk_unlocked(perk: PerkData)
+signal perk_activated(perk: PerkData)
+signal perk_deactivated(perk: PerkData)
+
+@export var max_active_perks: int = 5  # Performance limit
+@export var effect_component: EffectComponent
+
+var unlocked_perks: Array[PerkData] = []
+var active_perks: Dictionary = {}  # perk_id: PerkInstance
+
+func activate_perk(perk: PerkData) -> bool:
+    if active_perks.size() >= max_active_perks:
+        return false
+        
+    if not _validate_perk_requirements(perk):
+        return false
+    
+    var instance = _create_perk_instance(perk)
+    if instance:
+        active_perks[perk.id] = instance
+        _apply_perk_effects(instance)
+        perk_activated.emit(perk)
+        return true
+    
+    return false
+```
+
+## 5. Meta Save System
+```gdscript
+# /src/scripts/meta/meta_save_system.gd
+class_name MetaSaveSystem
+extends Node
+
+signal save_completed
+signal load_completed
+
+const SAVE_PATH = "user://meta_progress.save"
+const BACKUP_PATH = "user://meta_progress.backup"
+
+func save_meta_progress() -> void:
+    var save_data = {
+        "currencies": MetaProgressManager.currencies.duplicate(),
+        "unlocks": MetaProgressManager.unlocks.duplicate(),
+        "perks": _serialize_perks(),
+        "version": ProjectSettings.get_setting("application/config/version")
+    }
+    
+    # Create backup before saving
+    if FileAccess.file_exists(SAVE_PATH):
+        DirAccess.copy_absolute(SAVE_PATH, BACKUP_PATH)
+    
+    var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+    if file:
+        file.store_var(save_data)
+        save_completed.emit()
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/meta_progression_test.tscn
+- Node2D (root)
+  - MetaProgressManager
+  - UnlockSystem
+  - PerkSystem
+  - PerformanceMonitor
+  - TestUI
+    - CurrencyDisplay
+    - UnlockTree
+    - PerkSelection
+    - ProgressStats
+```
+
+2. Test scenarios:
+- Currency accumulation
+- Unlock purchases
+- Perk activation
+- Save/load system
+- Performance impact
+- Memory management
+- UI responsiveness
+
+## Next Steps
+
+1. Add achievement system
+2. Create accessibility options
+3. Implement analytics
+4. Add tutorial system
+
+Would you like me to continue with the achievement system next? 

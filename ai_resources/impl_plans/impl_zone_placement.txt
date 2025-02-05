@@ -1,0 +1,254 @@
+# Zone Placement System Implementation Plan
+
+## 1. Zone Placement Validator
+```gdscript
+# /src/scripts/zones/zone_placement_validator.gd
+class_name ZonePlacementValidator
+extends Node
+
+signal validation_updated(is_valid: bool, reason: String)
+
+@export_group("Placement Rules")
+@export var min_distance_between_zones: float = 200.0
+@export var min_distance_from_enemies: float = 150.0
+@export var max_distance_from_player: float = 500.0
+@export var check_frequency: int = 3  # Performance optimization
+
+var quadtree: QuadTree  # Spatial partitioning for performance
+var cached_validation: bool = false
+var cached_reason: String = ""
+var update_counter: int = 0
+
+func _physics_process(_delta: float) -> void:
+    update_counter += 1
+    if update_counter >= check_frequency:
+        update_counter = 0
+        _update_validation()
+
+func validate_position(position: Vector2) -> Dictionary:
+    # Quick distance check first (performance optimization)
+    var player = get_tree().get_first_node_in_group("players")
+    if player and position.distance_to(player.global_position) > max_distance_from_player:
+        return {
+            "valid": false,
+            "reason": "Too far from player"
+        }
+    
+    # Use quadtree for efficient zone distance checks
+    var nearby_zones = quadtree.query_radius(position, min_distance_between_zones)
+    if not nearby_zones.is_empty():
+        return {
+            "valid": false,
+            "reason": "Too close to another zone"
+        }
+    
+    # Check enemy positions
+    var nearby_enemies = get_tree().get_nodes_in_group("enemies")
+    for enemy in nearby_enemies:
+        if position.distance_to(enemy.global_position) < min_distance_from_enemies:
+            return {
+                "valid": false,
+                "reason": "Too close to enemies"
+            }
+    
+    return {
+        "valid": true,
+        "reason": "Valid placement"
+    }
+```
+
+## 2. Zone Placement Preview
+```gdscript
+# /src/scripts/zones/zone_placement_preview.gd
+class_name ZonePlacementPreview
+extends Node2D
+
+@export var preview_material: ShaderMaterial
+@export var valid_color: Color = Color(0, 1, 0, 0.5)
+@export var invalid_color: Color = Color(1, 0, 0, 0.5)
+@export var influence_radius: float = 300.0
+
+@onready var sprite: Sprite2D = $PreviewSprite
+@onready var radius_indicator: Line2D = $RadiusIndicator
+@onready var influence_area: Area2D = $InfluenceArea
+
+var is_valid: bool = false
+var current_position: Vector2
+
+func _process(_delta: float) -> void:
+    global_position = get_global_mouse_position()
+    _update_visual_state()
+    _update_influence_preview()
+
+func set_validation_state(valid: bool, reason: String = "") -> void:
+    is_valid = valid
+    sprite.material.set_shader_parameter(
+        "overlay_color",
+        valid_color if valid else invalid_color
+    )
+    
+    # Update tooltip if reason changed
+    if not reason.is_empty():
+        $Tooltip.text = reason
+
+func _update_influence_preview() -> void:
+    # Show how this placement would affect nearby entities
+    var nearby_enemies = influence_area.get_overlapping_bodies()
+    for enemy in nearby_enemies:
+        if enemy.has_node("PreviewEffect"):
+            enemy.get_node("PreviewEffect").show_zone_influence(
+                global_position,
+                influence_radius
+            )
+```
+
+## 3. Strategic Placement Helper
+```gdscript
+# /src/scripts/zones/strategic_placement_helper.gd
+class_name StrategicPlacementHelper
+extends Node
+
+signal strategic_spot_found(position: Vector2, score: float)
+
+@export var update_frequency: float = 0.5
+@export var suggestion_count: int = 3
+
+var strategic_spots: Array[Dictionary] = []
+var update_timer: float = 0.0
+
+func _process(delta: float) -> void:
+    update_timer += delta
+    if update_timer >= update_frequency:
+        update_timer = 0.0
+        _update_strategic_spots()
+
+func _update_strategic_spots() -> void:
+    strategic_spots.clear()
+    
+    var player = get_tree().get_first_node_in_group("players")
+    if not player:
+        return
+    
+    var potential_spots = _generate_potential_spots(player.global_position)
+    
+    for spot in potential_spots:
+        var score = _evaluate_position(spot)
+        if score > 0:
+            strategic_spots.append({
+                "position": spot,
+                "score": score
+            })
+    
+    strategic_spots.sort_custom(func(a, b): return a.score > b.score)
+    _show_best_spots()
+
+func _evaluate_position(position: Vector2) -> float:
+    var score = 0.0
+    
+    # Check enemy density
+    var nearby_enemies = _get_nearby_enemies(position)
+    score += nearby_enemies.size() * 10.0
+    
+    # Check resource spawns
+    var nearby_resources = _get_nearby_resources(position)
+    score += nearby_resources.size() * 5.0
+    
+    # Check existing zone coverage
+    var zone_coverage = _calculate_zone_coverage(position)
+    score -= zone_coverage * 20.0
+    
+    return score
+
+func _show_best_spots() -> void:
+    for i in min(suggestion_count, strategic_spots.size()):
+        var spot = strategic_spots[i]
+        strategic_spot_found.emit(spot.position, spot.score)
+```
+
+## 4. Zone Placement Manager
+```gdscript
+# /src/scripts/zones/zone_placement_manager.gd
+class_name ZonePlacementManager
+extends Node
+
+signal placement_state_changed(can_place: bool)
+signal zone_placed(zone: Node2D)
+signal placement_mode_changed(is_active: bool)
+
+@export var max_zones: int = 3
+@export var placement_cooldown: float = 1.0
+@export var zone_scene: PackedScene
+
+var can_place: bool = true
+var placement_mode: bool = false
+var active_zones: Array[Node2D] = []
+var preview: ZonePlacementPreview
+var validator: ZonePlacementValidator
+var strategic_helper: StrategicPlacementHelper
+
+func _ready() -> void:
+    preview = $ZonePlacementPreview
+    validator = $ZonePlacementValidator
+    strategic_helper = $StrategicPlacementHelper
+    
+    preview.hide()
+    _connect_signals()
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event.is_action_pressed("toggle_placement_mode"):
+        toggle_placement_mode()
+    elif event.is_action_pressed("place_zone") and placement_mode:
+        try_place_zone()
+
+func toggle_placement_mode() -> void:
+    placement_mode = !placement_mode
+    preview.visible = placement_mode
+    placement_mode_changed.emit(placement_mode)
+    
+    if placement_mode:
+        strategic_helper.enabled = true
+    else:
+        strategic_helper.enabled = false
+
+func try_place_zone() -> void:
+    if not can_place or active_zones.size() >= max_zones:
+        return
+    
+    var validation = validator.validate_position(get_global_mouse_position())
+    if validation.valid:
+        _place_zone(get_global_mouse_position())
+```
+
+## 5. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/zone_placement_test.tscn
+- Node2D (root)
+  - ZonePlacementManager
+  - TestPlayer
+  - TestEnemies
+  - TestResources
+  - PerformanceMonitor
+  - TestUI
+    - PlacementGuide
+    - StrategicHints
+    - ZoneCounter
+```
+
+2. Test scenarios:
+- Placement validation
+- Strategic suggestion system
+- Performance with many entities
+- Visual feedback clarity
+- Placement restrictions
+- Enemy interaction preview
+
+## Next Steps
+
+1. Add visual feedback for enemy awareness
+2. Implement sound effects system
+3. Create resource UI system
+4. Develop tutorial system
+
+Would you like me to continue with any of these next steps? 

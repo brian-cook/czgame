@@ -1,0 +1,213 @@
+# Enemy Attack Pattern Implementation Plan
+
+## 1. Attack Pattern Resource
+```gdscript
+# /src/resources/enemies/attack_pattern_data.gd
+class_name AttackPatternData
+extends Resource
+
+@export_group("Basic Info")
+@export var id: String = ""
+@export var name: String = ""
+@export var difficulty: int = 1
+@export var telegraph_time: float = 0.5
+
+@export_group("Pattern Settings")
+@export var phases: Array[AttackPhase] = []
+@export var repeat_count: int = 1
+@export var cooldown: float = 2.0
+
+@export_group("Performance")
+@export var max_projectiles: int = 50  # Performance limit
+@export var max_effects: int = 10      # Visual effects limit
+```
+
+## 2. Attack Pattern Controller
+```gdscript
+# /src/scripts/enemies/attack_pattern_controller.gd
+class_name AttackPatternController
+extends Node
+
+signal pattern_started(pattern: AttackPatternData)
+signal pattern_completed
+signal phase_changed(phase_index: int)
+
+@export var attack_component: EnemyAttackComponent
+@export var effect_component: AttackEffectComponent
+@export var update_frequency: int = 2  # Performance optimization
+
+var current_pattern: AttackPatternData
+var current_phase_index: int = -1
+var is_attacking: bool = false
+var update_counter: int = 0
+
+func _physics_process(delta: float) -> void:
+    update_counter += 1
+    if update_counter >= update_frequency:
+        update_counter = 0
+        _update_pattern(delta)
+
+func start_pattern(pattern: AttackPatternData) -> void:
+    if is_attacking:
+        return
+        
+    current_pattern = pattern
+    current_phase_index = -1
+    is_attacking = true
+    pattern_started.emit(pattern)
+    _advance_phase()
+
+func _update_pattern(delta: float) -> void:
+    if not is_attacking or not current_pattern:
+        return
+    
+    var current_phase = current_pattern.phases[current_phase_index]
+    current_phase.update(delta, attack_component)
+    
+    if current_phase.is_completed():
+        _advance_phase()
+```
+
+## 3. Attack Phase System
+```gdscript
+# /src/scripts/enemies/attack_phase.gd
+class_name AttackPhase
+extends Resource
+
+@export_group("Phase Settings")
+@export var duration: float = 1.0
+@export var projectile_type: String = "basic"
+@export var pattern_type: String = "spread"
+@export var shots_per_burst: int = 3
+@export var burst_interval: float = 0.2
+
+@export_group("Pattern Parameters")
+@export var angle_spread: float = 45.0
+@export var rotation_speed: float = 0.0
+@export var movement_curve: Curve
+
+var time_elapsed: float = 0.0
+var shots_fired: int = 0
+var burst_timer: float = 0.0
+
+func update(delta: float, attack_component: EnemyAttackComponent) -> void:
+    time_elapsed += delta
+    burst_timer -= delta
+    
+    if burst_timer <= 0 and shots_fired < shots_per_burst:
+        _fire_projectiles(attack_component)
+        burst_timer = burst_interval
+        shots_fired += 1
+
+func _fire_projectiles(attack_component: EnemyAttackComponent) -> void:
+    match pattern_type:
+        "spread":
+            _fire_spread_pattern(attack_component)
+        "circle":
+            _fire_circle_pattern(attack_component)
+        "spiral":
+            _fire_spiral_pattern(attack_component)
+```
+
+## 4. Enemy Attack Component
+```gdscript
+# /src/scripts/enemies/components/enemy_attack_component.gd
+class_name EnemyAttackComponent
+extends Node2D
+
+signal attack_started(pattern_name: String)
+signal projectile_fired(projectile: Node2D)
+
+@export var projectile_pools: Dictionary = {}  # type: ObjectPool
+@export var effect_pools: Dictionary = {}      # type: ObjectPool
+@export var max_active_projectiles: int = 50   # Performance limit
+
+var active_projectiles: Array[Node2D] = []
+var pattern_controller: AttackPatternController
+
+func _ready() -> void:
+    pattern_controller = $PatternController
+    _initialize_pools()
+
+func fire_projectile(type: String, direction: Vector2, speed: float) -> void:
+    if active_projectiles.size() >= max_active_projectiles:
+        return
+        
+    var pool = projectile_pools.get(type)
+    if not pool:
+        return
+        
+    var projectile = pool.get_object()
+    if projectile:
+        projectile.setup(direction, speed)
+        active_projectiles.append(projectile)
+        projectile_fired.emit(projectile)
+```
+
+## 5. Attack Telegraph System
+```gdscript
+# /src/scripts/enemies/telegraph_system.gd
+class_name AttackTelegraphSystem
+extends Node2D
+
+@export var telegraph_material: ShaderMaterial
+@export var fade_time: float = 0.3
+
+var active_telegraphs: Dictionary = {}  # pattern: Array[Node2D]
+var telegraph_pool: ObjectPool
+
+func show_telegraph(pattern: AttackPatternData, positions: Array[Vector2]) -> void:
+    if active_telegraphs.has(pattern):
+        return
+        
+    var telegraph_nodes: Array[Node2D] = []
+    for pos in positions:
+        var telegraph = _create_telegraph()
+        if telegraph:
+            telegraph.global_position = pos
+            telegraph_nodes.append(telegraph)
+    
+    active_telegraphs[pattern] = telegraph_nodes
+    _animate_telegraphs(telegraph_nodes)
+
+func _animate_telegraphs(telegraphs: Array[Node2D]) -> void:
+    for telegraph in telegraphs:
+        var tween = create_tween()
+        tween.tween_property(telegraph, "modulate:a", 1.0, fade_time)
+```
+
+## 6. Testing Implementation
+
+1. Create test scenes:
+```gdscript
+# /src/tests/enemy_attack_test.tscn
+- Node2D (root)
+  - TestEnemy
+    - AttackComponent
+    - PatternController
+  - TestPlayer
+  - ProjectileManager
+  - EffectSystem
+  - PerformanceMonitor
+  - TestUI
+    - PatternDebug
+    - ProjectileCounter
+```
+
+2. Test scenarios:
+- Pattern execution
+- Telegraph visibility
+- Projectile management
+- Performance optimization
+- Memory usage
+- Visual clarity
+- Pattern combinations
+
+## Next Steps
+
+1. Develop boss combat mechanics
+2. Implement weapon synergies
+3. Create special effects system
+4. Add pattern variations
+
+Would you like me to continue with any of these next steps? 

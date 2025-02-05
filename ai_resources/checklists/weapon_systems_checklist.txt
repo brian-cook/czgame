@@ -1,0 +1,29 @@
+# Phase 4: Weapon Systems Checklist
+
+## 1. Base Weapon System (weapon_base.gd)
+### Core Setup
+- [ ] Base weapon class
+- [ ] Attack handling
+- [ ] Damage system
+- [ ] Weapon states
+
+### Weapon Types
+- [ ] Melee weapons
+- [ ] Ranged weapons
+- [ ] Area weapons
+- [ ] Special weapons
+
+## 2. Weapon Upgrades (weapon_upgrades.gd)
+### Upgrade System
+- [ ] Upgrade tree
+- [ ] Stat modifications
+- [ ] Special effects
+- [ ] Level requirements
+
+### Synergies
+- [ ] Weapon combinations
+- [ ] Effect stacking
+- [ ] Unlock system
+- [ ] Visual feedback
+
+Progress: 0/16 tasks completed 
