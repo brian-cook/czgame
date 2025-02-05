@@ -1,6 +1,6 @@
 # Phase 9: Polish & Feedback Checklist
 
-## 1. Visual Effects (special_effects.gd)
+## 1. Visual Effects System
 ### Effect System
 - [ ] Particle systems
 - [ ] Animation effects

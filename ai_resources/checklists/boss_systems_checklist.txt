@@ -1,6 +1,6 @@
 # Phase 7: Boss Systems Checklist
 
-## 1. Boss Base (boss_base.gd)
+## 1. Boss Base System
 ### Core Setup
 - [ ] Base boss class
 - [ ] Health system
@@ -13,7 +13,7 @@
 - [ ] Minion spawning
 - [ ] Arena hazards
 
-## 2. Boss Variations (boss_variations.gd)
+## 2. Boss Variations
 ### Variation System
 - [ ] Variant types
 - [ ] Unique abilities

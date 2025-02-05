@@ -1,6 +1,6 @@
 # Phase 10: UI & UX Checklist
 
-## 1. UI Polish (ui_polish.gd)
+## 1. UI Polish System
 ### Core UI
 - [ ] Menu systems
 - [ ] HUD elements

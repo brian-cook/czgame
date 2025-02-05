@@ -1,6 +1,6 @@
 # Phase 8: Level & Flow Checklist
 
-## 1. Level Generation (level_generator.gd)
+## 1. Level Generation System
 ### Core Generation
 - [ ] Room generation
 - [ ] Layout system
@@ -13,7 +13,7 @@
 - [ ] Resource placement
 - [ ] Special areas
 
-## 2. Game Flow (game_flow.gd)
+## 2. Game Flow System
 ### Wave System
 - [ ] Wave generation
 - [ ] Enemy spawning
