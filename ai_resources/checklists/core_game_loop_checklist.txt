@@ -9,11 +9,11 @@
 - [x] Add basic attack method
 - [x] Create health system
 - [x] Add basic death handling
-- [ ] Implement player state machine (idle, move, attack, hurt)
-- [ ] Add input buffering for smoother controls
-- [ ] Setup proper player scene hierarchy
-- [~] Add debug visualization tools (basic prints implemented)
-- [~] Implement proper signal architecture (basic signals exist)
+- [x] Implement player state machine (idle, move, attack, hurt)
+- [x] Add input buffering for smoother controls
+- [x] Setup proper player scene hierarchy
+- [x] Add debug visualization tools
+- [x] Implement proper signal architecture
 
 ### Enemy Setup
 - [x] Create basic_enemy.gd script
@@ -43,7 +43,7 @@
 - [ ] Setup event bus for combat events
 - [ ] Implement object pooling manager
 - [ ] Add performance monitoring
-- [~] Setup debug tools (basic prints implemented)
+- [x] Setup debug tools
 - [ ] Create proper scene hierarchy
 
 ## Phase 2: Comfort Zone System
@@ -101,7 +101,7 @@
 - [ ] Implement wave indicator
 - [ ] Setup basic game over screen
 
-Progress: 30/40 tasks completed (including partial implementations)
+Progress: 35/52 tasks completed (including partial implementations)
 
 ## Implementation Order:
 1. ✅ Player movement and health

@@ -14,3 +14,14 @@ config/name="CZgame"
 run/main_scene="res://src/scenes/test/test_game.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 config/icon="res://icon.svg"
+
+[autoload]
+
+# Add autoloads here if needed
+
+[_global_script_class_icons]
+
+PlayerState="res://src/scripts/player/states/player_state.gd"
+PlayerIdleState="res://src/scripts/player/states/player_idle_state.gd"
+PlayerMoveState="res://src/scripts/player/states/player_move_state.gd"
+PlayerStateMachine="res://src/scripts/player/player_state_machine.gd"

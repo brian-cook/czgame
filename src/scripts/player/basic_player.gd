@@ -25,6 +25,8 @@ var _current_health: float
 var _can_take_damage: bool = true
 var _can_attack: bool = true
 
+@onready var state_machine: PlayerStateMachine = $StateMachine
+
 func _ready() -> void:
 	print("Player ready")
 	add_to_group("players")
@@ -55,35 +57,6 @@ func _verify_input_actions() -> void:
 		else:
 			print("Input action verified: " + action)
 
-func _physics_process(delta: float) -> void:
-	if Engine.get_frames_drawn() % 60 == 0:  # Print every second
-		print("Player position: ", global_position)
-	_handle_movement(delta)
-
-func _handle_movement(delta: float) -> void:
-	var input_vector = Vector2.ZERO
-	
-	# Get individual inputs with debug prints
-	var up = Input.get_action_strength("move_up")
-	var down = Input.get_action_strength("move_down")
-	var left = Input.get_action_strength("move_left")
-	var right = Input.get_action_strength("move_right")
-	
-	if Engine.get_frames_drawn() % 60 == 0:  # Print every second
-		print("Input values - Up: ", up, " Down: ", down, " Left: ", left, " Right: ", right)
-	
-	input_vector = Vector2(
-		right - left,
-		down - up
-	).normalized()
-	
-	if input_vector != Vector2.ZERO:
-		velocity = velocity.move_toward(input_vector * speed, acceleration * delta)
-	else:
-		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
-	
-	move_and_slide()
-
 func take_damage(amount: float) -> void:
 	if not _can_take_damage:
 		return
@@ -96,6 +69,7 @@ func take_damage(amount: float) -> void:
 		die()
 	else:
 		_start_invincibility()
+		state_machine.transition_to("Hurt")
 
 func _start_invincibility() -> void:
 	_can_take_damage = false
