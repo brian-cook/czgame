@@ -22,7 +22,7 @@ const ResourcePickupScript := preload("res://src/scripts/resources/resource_pick
 @export var max_resources: int = 50
 
 var _active_enemies: Array[BasicEnemy] = []
-var _active_zones: Array[Node] = []  # Changed to Node for now
+var _current_zone: ComfortZone = null  # Instead of _active_zones array
 var _active_resources: Array[Area2D] = []
 
 func _ready() -> void:
@@ -99,14 +99,19 @@ func _spawn_enemy() -> void:
 	_active_enemies.append(enemy)
 
 func _place_comfort_zone(spawn_pos: Vector2) -> void:
-	var zone = comfort_zone_scene.instantiate()
-	if not zone or not zone is Area2D:
+	# Remove existing zone if it exists
+	if _current_zone and is_instance_valid(_current_zone):
+		_current_zone.queue_free()
+	
+	print("Placing comfort zone at: ", spawn_pos)  # Debug print
+	var zone = ComfortZoneScene.instantiate()
+	if not zone:
 		push_error("Failed to instantiate comfort zone!")
 		return
 		
 	zone.position = spawn_pos
 	add_child(zone)
-	_active_zones.append(zone)
+	_current_zone = zone
 
 func _get_random_spawn_position() -> Vector2:
 	if not player:
@@ -140,6 +145,7 @@ func _setup_input_actions() -> void:
 	print("Setting up input actions")
 	_setup_movement_actions()
 	_setup_combat_actions()
+	_setup_zone_actions()
 
 func _setup_movement_actions() -> void:
 	print("Setting up movement actions")
@@ -171,11 +177,18 @@ func _setup_combat_actions() -> void:
 		event_attack.button_index = MOUSE_BUTTON_LEFT
 		InputMap.action_add_event("attack", event_attack)
 
+func _setup_zone_actions() -> void:
+	if not InputMap.has_action("place_zone"):
+		InputMap.add_action("place_zone")
+		var event = InputEventKey.new()
+		event.keycode = KEY_SPACE
+		InputMap.action_add_event("place_zone", event)
+
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		match event.button_index:
-			MOUSE_BUTTON_RIGHT:
-				_place_comfort_zone(get_global_mouse_position()) 
+	if event.is_action_pressed("place_zone"):
+		# Place zone at player position instead of mouse position
+		if player:
+			_place_comfort_zone(player.global_position)
 
 func _start_resource_spawning() -> void:
 	var timer = Timer.new()
@@ -188,7 +201,7 @@ func _spawn_resource() -> void:
 	if _active_resources.size() >= max_resources:
 		return
 		
-	print("Attempting to spawn resource")  # Debug print
+	print("Attempting to spawn resource")
 	var resource = ResourcePickupScene.instantiate()
 	if not resource:
 		push_error("Failed to instantiate resource!")
@@ -197,18 +210,14 @@ func _spawn_resource() -> void:
 	var spawn_pos = _get_random_spawn_position()
 	resource.position = spawn_pos
 	
-	# Connect to the signal before adding to scene
-	if resource.has_signal("collected"):
-		print("Connecting resource collected signal")  # Debug print
-		resource.collected.connect(
-			func(value: float):
-				print("Resource collected with value: ", value)  # Debug print
-				_on_resource_collected(value)
-		)
-	
+	# Verify script is attached
+	if not resource.get_script():
+		push_error("Resource script not attached! Check if script is properly attached in resource_pickup.tscn")
+		return
+		
 	add_child(resource)
 	_active_resources.append(resource)
-	print("Resource spawned at: ", spawn_pos)  # Debug print
+	print("Resource spawned at: ", spawn_pos)
 
 func _on_resource_collected(value: float) -> void:
 	print("Resource collected: ", value)
@@ -216,9 +225,17 @@ func _on_resource_collected(value: float) -> void:
 	for resource in _active_resources:
 		if not is_instance_valid(resource):
 			_active_resources.erase(resource)
+	
+	# Update counter
+	if resource_counter:
+		resource_counter.add_resources(value)
+		print("Updated resource counter: ", value)  # Debug print
+	else:
+		push_error("Resource counter not found!")
 
 func _on_player_resource_collected(amount: float) -> void:
 	if resource_counter:
 		resource_counter.add_resources(amount)
+		print("Player collected resource: ", amount)  # Debug print
 	else:
-		print("Resource collected but counter not available: ", amount)
+		push_error("Resource counter not found!")

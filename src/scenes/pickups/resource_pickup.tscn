@@ -1,14 +1,20 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=3 format=3 uid="uid://b8x4xv2q6p8y"]
 
 [ext_resource type="Script" path="res://src/scripts/resources/resource_pickup.gd" id="1_pickup"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_1"]
-radius = 16.0
+radius = 32.0
 
 [node name="ResourcePickup" type="Area2D"]
 collision_layer = 16  # Layer 5 for resources
 collision_mask = 2    # Layer 2 for player
+monitoring = true
+monitorable = true
 script = ExtResource("1_pickup")
+base_value = 1.0
+collection_radius = 100.0
+move_speed = 400.0
+acceleration = 2000.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_1")

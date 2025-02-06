@@ -14,6 +14,7 @@ func add_resources(amount: float) -> void:
     _update_display()
     if _animation_player:
         _animation_player.play("collect")
+    print("Resources updated: ", _current_resources)  # Debug print
 
 func _update_display() -> void:
     if _label:

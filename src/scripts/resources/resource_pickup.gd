@@ -1,54 +1,66 @@
-@tool  # Add tool to ensure class registration
+@tool
 class_name ResourcePickup
 extends Area2D
 
+## Signal emitted when resource is collected
 signal collected(value: float)
 
+@export_group("Resource Properties")
 @export var base_value: float = 1.0
-@export var collection_radius: float = 32.0
-@export var move_speed: float = 200.0
-@export var acceleration: float = 1000.0
+@export var collection_radius: float = 100.0
+@export var move_speed: float = 400.0
+@export var acceleration: float = 2000.0
 
 var _current_value: float
 var _target: Node2D
 var _velocity: Vector2 = Vector2.ZERO
+var _value_multiplier: float = 1.0
+var _is_being_collected: bool = false
 
 func _ready() -> void:
-    print("Resource pickup ready")  # Debug print
-    _current_value = base_value
-    add_to_group("resources")
-    
-    # Only setup collision in game, not in editor
-    if not Engine.is_editor_hint():
-        _setup_collision()
-        area_entered.connect(_on_area_entered)
-
-func _setup_collision() -> void:
-    if not $CollisionShape2D.shape:
-        var shape := CircleShape2D.new()
-        shape.radius = collection_radius
-        $CollisionShape2D.shape = shape
+	print("Resource pickup ready at: ", global_position)
+	_current_value = base_value
+	add_to_group("resources")
+	
+	# Set up collision
+	collision_layer = 16    # Layer 5 for resources
+	collision_mask = 2     # Layer 2 for player
+	monitoring = true
+	monitorable = true
+	
+	print("Resource collision setup - Layer: ", collision_layer, " Mask: ", collision_mask)
+	print("Resource script: ", get_script().get_path())
 
 func _physics_process(delta: float) -> void:
-    if Engine.is_editor_hint():
-        return
-        
-    if _target:
-        var direction = (_target.global_position - global_position).normalized()
-        _velocity = _velocity.move_toward(direction * move_speed, acceleration * delta)
-        position += _velocity * delta
-
-func _on_area_entered(area: Area2D) -> void:
-    var parent = area.get_parent()
-    if parent.is_in_group("players"):
-        print("Player entered resource area")  # Debug print
-        collected.emit(_current_value)
-        queue_free()
-
-func set_value_multiplier(multiplier: float) -> void:
-    _current_value = base_value * multiplier
+	if not _is_being_collected or not _target:
+		return
+		
+	if not is_instance_valid(_target):
+		queue_free()
+		return
+		
+	var direction = (_target.global_position - global_position).normalized()
+	_velocity = _velocity.move_toward(direction * move_speed, acceleration * delta)
+	position += _velocity * delta
+	
+	# Check if we're close enough to collect
+	if global_position.distance_to(_target.global_position) < 20.0:
+		_collect()
 
 func start_collection(collector: Node2D) -> void:
-    print("Starting collection towards: ", collector.name)  # Debug print
-    _target = collector
-    # Don't emit collected signal here, wait for area collision 
+	print("Start collection called by: ", collector.name)
+	if not _is_being_collected:
+		print("Starting collection by: ", collector.name)
+		_is_being_collected = true
+		_target = collector
+
+func _collect() -> void:
+	if is_instance_valid(self):
+		print("Resource collected with value: ", _current_value)
+		collected.emit(_current_value)
+		queue_free()
+
+func set_value_multiplier(multiplier: float) -> void:
+	_value_multiplier = multiplier
+	_current_value = base_value * _value_multiplier
+	modulate = Color(1.0, 0.8, 0.0) if _value_multiplier == 1.0 else Color(1.0, 1.0, 0.0)  # Visual feedback 

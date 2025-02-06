@@ -25,20 +25,25 @@ var _current_health: float
 var _can_take_damage: bool = true
 var _can_attack: bool = true
 
-# Add preload at the top
-const ResourcePickupScript := preload("res://src/scripts/resources/resource_pickup.gd")
-
 func _ready() -> void:
 	print("Player ready")
 	add_to_group("players")
 	_current_health = max_health
 	health_changed.emit(_current_health, max_health)
 	
-	# Wait a frame to ensure input actions are set up
+	# Set up resource collector
+	var collector = $ResourceCollector
+	collector.collision_layer = 2     # Layer 2 for player
+	collector.collision_mask = 16     # Layer 5 for resources
+	collector.monitoring = true
+	collector.monitorable = true
+	
+	print("ResourceCollector setup - Layer: ", collector.collision_layer, 
+		  " Mask: ", collector.collision_mask)
+	print("Player position: ", global_position)
+
 	await get_tree().process_frame
 	_verify_input_actions()
-	
-	$ResourceCollector.area_entered.connect(_on_resource_collector_area_entered)
 
 func _verify_input_actions() -> void:
 	var required_actions = ["move_up", "move_down", "move_left", "move_right"]
@@ -132,8 +137,20 @@ func _perform_attack() -> void:
 	)
 
 func _on_resource_collector_area_entered(area: Area2D) -> void:
-	if area.get_script() == ResourcePickupScript:
+	print("Player detected area: ", area.name)
+	print("Area script: ", area.get_script().get_path() if area.get_script() else "No script")
+	
+	# Check if area has the resource pickup script
+	var script_path = area.get_script().get_path() if area.get_script() else ""
+	if script_path.ends_with("resource_pickup.gd"):
+		print("Starting resource collection")
+		# Connect signal first
+		if area.has_signal("collected"):
+			area.collected.connect(_on_resource_collected)
 		area.start_collection(self)
-		area.collected.connect(
-			func(value: float): resource_collected.emit(value)
-		)
+	else:
+		print("Area is not a resource pickup: ", script_path)
+
+func _on_resource_collected(value: float) -> void:
+	print("Player collected resource: ", value)
+	resource_collected.emit(value)
