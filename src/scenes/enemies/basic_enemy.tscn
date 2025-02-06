@@ -1,0 +1,50 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://src/scripts/enemies/basic_enemy.gd" id="1_enemy"]
+[ext_resource type="Script" path="res://src/scripts/enemies/enemy_state_machine.gd" id="2_state_machine"]
+[ext_resource type="Script" path="res://src/scripts/enemies/states/enemy_chase_state.gd" id="3_chase"]
+[ext_resource type="Script" path="res://src/scripts/enemies/states/enemy_attack_state.gd" id="4_attack"]
+[ext_resource type="Script" path="res://src/scripts/enemies/states/enemy_stunned_state.gd" id="5_stunned"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_1"]
+radius = 16.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_2"]
+radius = 20.0
+
+[node name="BasicEnemy" type="CharacterBody2D"]
+collision_layer = 4
+collision_mask = 7
+script = ExtResource("1_enemy")
+
+[node name="StateMachine" type="Node" parent="."]
+script = ExtResource("2_state_machine")
+
+[node name="Chase" type="Node" parent="StateMachine"]
+script = ExtResource("3_chase")
+
+[node name="Attack" type="Node" parent="StateMachine"]
+script = ExtResource("4_attack")
+
+[node name="Stunned" type="Node" parent="StateMachine"]
+script = ExtResource("5_stunned")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_1")
+
+[node name="Sprite" type="ColorRect" parent="."]
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 16.0
+offset_bottom = 16.0
+color = Color(1, 0.3, 0.3, 1)
+
+[node name="Hitbox" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
+shape = SubResource("CircleShape2D_2")
+debug_color = Color(0.701961, 0, 0, 0.419608)
+
+[connection signal="area_entered" from="Hitbox" to="." method="_on_hitbox_area_entered"]

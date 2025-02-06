@@ -1,0 +1,116 @@
+# Core Game Loop Implementation Checklist
+
+## Phase 1: Basic Movement and Combat
+### Player Setup
+- [x] Create basic_player.gd script
+- [x] Setup player scene with collision shape
+- [x] Add player to "players" group
+- [x] Implement basic movement
+- [x] Add basic attack method
+- [x] Create health system
+- [x] Add basic death handling
+- [x] Implement player state machine (idle, move, attack, hurt)
+- [x] Add input buffering for smoother controls
+- [x] Setup proper player scene hierarchy
+- [x] Add debug visualization tools
+- [x] Implement proper signal architecture
+
+### Enemy Setup
+- [x] Create basic_enemy.gd script
+- [x] Setup enemy scene with collision shape
+- [x] Add enemy to "enemies" group
+- [x] Implement follow behavior
+- [x] Add collision damage
+- [x] Create basic death handling
+- [ ] Setup enemy object pooling
+- [x] Implement enemy state machine
+- [ ] Add enemy spawn manager
+- [ ] Setup enemy performance monitoring
+- [ ] Add distance-based update optimization
+
+### Basic Combat
+- [x] Setup hit detection
+- [x] Implement damage system
+- [x] Add basic knockback
+- [x] Create simple attack cooldown
+- [ ] Implement hit effects pool
+- [ ] Add combat feedback systems
+- [x] Setup proper collision layers
+- [x] Add invincibility frames
+- [ ] Implement damage number system
+
+### Core Systems
+- [ ] Setup event bus for combat events
+- [ ] Implement object pooling manager
+- [ ] Add performance monitoring
+- [x] Setup debug tools
+- [ ] Create proper scene hierarchy
+
+## Phase 2: Comfort Zone System
+### Zone Placement
+- [x] Create basic_comfort_zone.gd script
+- [x] Setup zone scene with Area2D
+- [x] Implement spacebar placement (updated from mouse placement)
+- [x] Add zone radius visualization
+- [x] Setup zone overlap detection
+
+### Zone Effects
+- [x] Add zone to "comfort_zones" group
+- [x] Implement resource multiplier
+- [x] Setup basic enemy slowdown
+- [x] Add visual feedback for zone effects
+
+## Phase 3: Resource System
+### Resource Setup
+- [x] Create basic_resource.gd script
+- [x] Setup resource scene with Area2D
+- [x] Add resource to "resources" group
+- [x] Implement value system
+- [x] Create collection detection
+
+### Resource Spawning
+- [x] Create basic resource spawner
+- [x] Implement random position generation
+- [ ] Add wave-based spawning
+- [ ] Setup basic collection UI
+
+## Phase 4: Wave System
+### Wave Management
+- [x] Create basic_wave_manager.gd script
+- [x] Implement wave counter
+- [x] Setup enemy spawning
+- [ ] Add wave completion detection
+- [ ] Create basic difficulty scaling
+
+### Game Flow
+- [x] Add wave start/end signals
+- [ ] Implement preparation time
+- [ ] Create wave UI elements
+- [ ] Setup basic game over condition
+
+## Core Systems (For Future Extensibility)
+### Event System
+- [x] Create basic event bus
+- [x] Setup core game signals
+- [x] Implement basic object pooling
+- [ ] Add performance monitoring hooks
+
+### Basic UI
+- [ ] Create health display
+- [ ] Add resource counter
+- [ ] Implement wave indicator
+- [ ] Setup basic game over screen
+
+Progress: 35/52 tasks completed (including partial implementations)
+
+## Implementation Order:
+1. ✅ Player movement and health
+2. ✅ Basic enemy behavior
+3. ✅ Simple combat
+4. ✅ Resource spawning and collection
+5. ✅ Comfort zone placement
+6. ⏳ Wave spawning system
+7. ❌ Core UI elements
+8. ❌ Basic game flow 
+
+Note: [~] indicates partially implemented features 
