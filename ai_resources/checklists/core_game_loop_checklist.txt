@@ -1,0 +1,92 @@
+# Core Game Loop Implementation Checklist
+
+## Phase 1: Basic Movement and Combat
+### Player Setup
+- [ ] Create basic_player.gd script
+- [ ] Setup player scene with collision shape
+- [ ] Add player to "players" group
+- [ ] Implement basic movement
+- [ ] Add basic attack method
+- [ ] Create health system
+- [ ] Add basic death handling
+
+### Enemy Setup
+- [ ] Create basic_enemy.gd script
+- [ ] Setup enemy scene with collision shape
+- [ ] Add enemy to "enemies" group
+- [ ] Implement follow behavior
+- [ ] Add collision damage
+- [ ] Create basic death handling
+
+### Basic Combat
+- [ ] Setup hit detection
+- [ ] Implement damage system
+- [ ] Add basic knockback
+- [ ] Create simple attack cooldown
+
+## Phase 2: Comfort Zone System
+### Zone Placement
+- [ ] Create basic_comfort_zone.gd script
+- [ ] Setup zone scene with Area2D
+- [ ] Implement mouse placement
+- [ ] Add zone radius visualization
+- [ ] Setup zone overlap detection
+
+### Zone Effects
+- [ ] Add zone to "comfort_zones" group
+- [ ] Implement resource multiplier
+- [ ] Setup basic enemy slowdown
+- [ ] Add visual feedback for zone effects
+
+## Phase 3: Resource System
+### Resource Setup
+- [ ] Create basic_resource.gd script
+- [ ] Setup resource scene with Area2D
+- [ ] Add resource to "resources" group
+- [ ] Implement value system
+- [ ] Create collection detection
+
+### Resource Spawning
+- [ ] Create basic resource spawner
+- [ ] Implement random position generation
+- [ ] Add wave-based spawning
+- [ ] Setup basic collection UI
+
+## Phase 4: Wave System
+### Wave Management
+- [ ] Create basic_wave_manager.gd script
+- [ ] Implement wave counter
+- [ ] Setup enemy spawning
+- [ ] Add wave completion detection
+- [ ] Create basic difficulty scaling
+
+### Game Flow
+- [ ] Add wave start/end signals
+- [ ] Implement preparation time
+- [ ] Create wave UI elements
+- [ ] Setup basic game over condition
+
+## Core Systems (For Future Extensibility)
+### Event System
+- [ ] Create basic event bus
+- [ ] Setup core game signals
+- [ ] Implement basic object pooling
+- [ ] Add performance monitoring hooks
+
+### Basic UI
+- [ ] Create health display
+- [ ] Add resource counter
+- [ ] Implement wave indicator
+- [ ] Setup basic game over screen
+
+Progress: 0/40 tasks completed
+
+## Implementation Order:
+1. Player movement and health
+2. Basic enemy behavior
+3. Simple combat
+4. Resource spawning and collection
+5. Comfort zone placement
+6. Wave spawning system
+7. Core UI elements
+8. Basic game flow 

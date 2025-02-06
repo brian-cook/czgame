@@ -1,0 +1,158 @@
+# Core Game Loop Implementation Plan
+
+## Phase 1: Basic Movement and Combat
+```gdscript
+# Core features needed:
+- Player movement and basic attack
+- Simple enemy that follows player
+- Basic health system
+- Basic UI showing health
+```
+
+### 1.1 Minimal Player Controller
+```gdscript
+# /src/scripts/player/basic_player.gd
+class_name BasicPlayer
+extends CharacterBody2D
+
+@export var speed: float = 300.0
+@export var health: float = 100.0
+
+func _physics_process(delta: float) -> void:
+    var input_vector = Input.get_vector("move_left", "move_right", "move_up", "move_down")
+    velocity = input_vector * speed
+    move_and_slide()
+
+func take_damage(amount: float) -> void:
+    health -= amount
+    if health <= 0:
+        die()
+```
+
+### 1.2 Basic Enemy
+```gdscript
+# /src/scripts/enemies/basic_enemy.gd
+class_name BasicEnemy
+extends CharacterBody2D
+
+@export var speed: float = 150.0
+@export var damage: float = 10.0
+@export var attack_cooldown: float = 1.0
+
+var can_attack: bool = true
+var target: Node2D
+
+func _physics_process(delta: float) -> void:
+    if not target:
+        target = get_tree().get_first_node_in_group("player")
+        return
+        
+    var direction = (target.global_position - global_position).normalized()
+    velocity = direction * speed
+    move_and_slide()
+```
+
+## Phase 2: Comfort Zone Basics
+```gdscript
+# Core features needed:
+- Simple comfort zone placement
+- Basic resource spawning
+- Zone effect on resources
+```
+
+### 2.1 Basic Comfort Zone
+```gdscript
+# /src/scripts/zones/basic_comfort_zone.gd
+class_name BasicComfortZone
+extends Area2D
+
+@export var radius: float = 100.0
+@export var resource_multiplier: float = 0.5
+
+func _ready() -> void:
+    var shape = CircleShape2D.new()
+    shape.radius = radius
+    $CollisionShape2D.shape = shape
+```
+
+## Phase 3: Resource System
+```gdscript
+# Core features needed:
+- Resource pickup items
+- Basic collection mechanics
+- Simple resource counter
+```
+
+### 3.1 Basic Resource
+```gdscript
+# /src/scripts/resources/basic_resource.gd
+class_name BasicResource
+extends Area2D
+
+@export var base_value: float = 1.0
+var current_value: float = 1.0
+
+func _on_area_entered(area: Area2D) -> void:
+    if area.is_in_group("comfort_zones"):
+        current_value *= area.resource_multiplier
+```
+
+## Phase 4: Wave System
+```gdscript
+# Core features needed:
+- Basic wave spawning
+- Simple difficulty scaling
+- Wave completion detection
+```
+
+### 4.1 Basic Wave Manager
+```gdscript
+# /src/scripts/waves/basic_wave_manager.gd
+class_name BasicWaveManager
+extends Node
+
+@export var enemies_per_wave: int = 10
+@export var wave_completion_time: float = 3.0
+
+var current_wave: int = 0
+var active_enemies: Array[Node] = []
+
+func start_wave() -> void:
+    current_wave += 1
+    var count = enemies_per_wave + (current_wave * 2)
+    _spawn_wave_enemies(count)
+```
+
+## Testing Implementation
+
+1. Create initial test scene:
+```gdscript
+# /src/scenes/test_game.tscn
+- Node2D (root)
+  - Player
+  - EnemySpawner
+  - ComfortZone
+  - ResourceSpawner
+  - BasicUI
+    - HealthBar
+    - ResourceCounter
+    - WaveIndicator
+```
+
+2. Core test scenarios:
+- Player movement and combat
+- Enemy behavior
+- Zone placement
+- Resource collection
+- Wave progression
+
+## Next Steps (In Order)
+
+1. Polish core movement and combat feel
+2. Improve comfort zone mechanics
+3. Add basic progression
+4. Implement simple weapon variety
+5. Add basic enemy variations
+6. Create simple boss encounters
+
+Would you like me to continue with any specific part of this basic implementation? 
