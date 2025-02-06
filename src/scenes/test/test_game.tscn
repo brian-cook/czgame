@@ -1,20 +1,13 @@
-[gd_scene load_steps=6 format=3 uid="uid://bo30iyjc41dfe"]
+[gd_scene load_steps=5 format=3 uid="uid://bo30iyjc41dfe"]
 
 [ext_resource type="PackedScene" path="res://src/scenes/enemies/basic_enemy.tscn" id="1_enemy"]
 [ext_resource type="PackedScene" path="res://src/scenes/player/basic_player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://src/scripts/test/test_game.gd" id="1_test"]
-[ext_resource type="PackedScene" path="res://src/scenes/zones/comfort_zone.tscn" id="4_comfort"]
 [ext_resource type="PackedScene" path="res://src/scenes/ui/resource_counter.tscn" id="5_counter"]
 
 [node name="TestGame" type="Node2D"]
 script = ExtResource("1_test")
 enemy_scene = ExtResource("1_enemy")
-comfort_zone_scene = ExtResource("4_comfort")
-spawn_radius = 800.0
-max_enemies = 10
-initial_enemy_count = 5
-resource_spawn_interval = 2.0
-max_resources = 50
 
 [node name="Background" type="ColorRect" parent="."]
 z_index = -1
