@@ -9,6 +9,9 @@ const ResourcePickupScript := preload("res://src/scripts/resources/resource_pick
 @onready var player := $Player as BasicPlayer
 @onready var health_bar := $UI/HealthBar as ProgressBar
 @onready var resource_counter := $UI/ResourceCounter as ResourceCounter
+@onready var object_pool_manager: ObjectPoolManager = $ObjectPoolManager
+@onready var enemy_spawn_manager: EnemySpawnManager = $EnemySpawnManager
+@onready var wave_indicator := $UI/WaveIndicator as WaveIndicator
 
 @export_group("Scene References")
 @export var enemy_scene: PackedScene
@@ -61,7 +64,7 @@ func _verify_nodes() -> bool:
 func _setup_game() -> void:
 	_connect_signals()
 	_setup_ui()
-	_spawn_initial_enemies()
+	_setup_spawn_manager()
 	_setup_comfort_zone_placement()
 	print("Game setup complete")
 
@@ -76,6 +79,13 @@ func _setup_ui() -> void:
 		health_bar.max_value = player.max_health
 		health_bar.value = player.max_health
 
+func _setup_spawn_manager() -> void:
+	if enemy_spawn_manager:
+		enemy_spawn_manager.initialize(object_pool_manager, player, wave_indicator)
+		enemy_spawn_manager.wave_started.connect(_on_wave_started)
+		enemy_spawn_manager.wave_completed.connect(_on_wave_completed)
+		enemy_spawn_manager.start_next_wave()
+
 func _setup_comfort_zone_placement() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
@@ -87,16 +97,13 @@ func _spawn_enemy() -> void:
 	if not player or _active_enemies.size() >= max_enemies:
 		return
 		
-	var enemy = enemy_scene.instantiate() as BasicEnemy
-	if not enemy:
-		push_error("Failed to instantiate enemy!")
-		return
-		
-	var spawn_position = _get_random_spawn_position()
-	enemy.position = spawn_position
-	enemy.enemy_died.connect(_on_enemy_died.bind(enemy))
-	add_child(enemy)
-	_active_enemies.append(enemy)
+	var enemy = object_pool_manager.get_object("enemy") as BasicEnemy
+	if enemy:
+		enemy.initialize(_get_random_spawn_position())
+		enemy.enemy_died.connect(
+			func(): _on_enemy_died(enemy)
+		)
+		_active_enemies.append(enemy)  # Add to active enemies list
 
 func _place_comfort_zone(spawn_pos: Vector2) -> void:
 	# Remove existing zone if it exists
@@ -137,8 +144,11 @@ func _on_player_died() -> void:
 	)
 	timer.start()
 
-func _on_enemy_died(enemy: BasicEnemy) -> void:
-	_active_enemies.erase(enemy)
+func _on_enemy_died(enemy: Node) -> void:
+	_active_enemies.erase(enemy)  # Remove from active enemies list
+	object_pool_manager.return_object(enemy, "enemy")
+	
+	# Spawn new enemy after delay
 	get_tree().create_timer(2.0).timeout.connect(_spawn_enemy)
 
 func _setup_input_actions() -> void:
@@ -239,3 +249,11 @@ func _on_player_resource_collected(amount: float) -> void:
 		print("Player collected resource: ", amount)  # Debug print
 	else:
 		push_error("Resource counter not found!")
+
+func _on_wave_started(wave_number: int) -> void:
+	print("Wave ", wave_number, " started!")
+	# TODO: Update UI
+
+func _on_wave_completed(wave_number: int) -> void:
+	print("Wave ", wave_number, " completed!")
+	# TODO: Update UI

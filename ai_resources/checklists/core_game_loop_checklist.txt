@@ -23,7 +23,7 @@
 - [x] Add collision damage
 - [x] Create basic death handling
 - [ ] Setup enemy object pooling
-- [ ] Implement enemy state machine
+- [x] Implement enemy state machine
 - [ ] Add enemy spawn manager
 - [ ] Setup enemy performance monitoring
 - [ ] Add distance-based update optimization
