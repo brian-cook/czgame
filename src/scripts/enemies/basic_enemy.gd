@@ -76,3 +76,41 @@ func initialize(pos: Vector2) -> void:
 	
 	show()
 	process_mode = Node.PROCESS_MODE_INHERIT
+
+func reset() -> void:
+	# Reset all state when returned to pool
+	_current_health = max_health
+	velocity = Vector2.ZERO
+	
+	# Reset state machine more efficiently
+	if state_machine:
+		# Clear current state without transition
+		if state_machine.current_state:
+			state_machine.current_state.exit()
+		state_machine.current_state = state_machine.states["chase"]
+		state_machine._last_transition_time = 0.0
+	
+	# Clear any ongoing effects or timers more efficiently
+	for child in get_children():
+		if child is Timer:
+			child.stop()
+		elif child.has_method("reset"):
+			child.reset()
+	
+	# Reset transform state
+	global_position = Vector2.ZERO
+	global_rotation = 0
+	global_scale = Vector2.ONE
+	modulate = Color.WHITE
+	
+	# Clear target reference
+	_target = null
+	
+	# Disconnect all signals
+	var connections = enemy_died.get_connections()
+	for conn in connections:
+		enemy_died.disconnect(conn.callable)
+	
+	connections = health_changed.get_connections()
+	for conn in connections:
+		health_changed.disconnect(conn.callable)

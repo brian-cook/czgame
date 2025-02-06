@@ -1,11 +1,11 @@
-[gd_scene load_steps=7 format=3 uid="uid://bo30iyjc41dfe"]
+[gd_scene load_steps=8 format=3 uid="uid://bo30iyjc41dfe"]
 
 [ext_resource type="PackedScene" path="res://src/scenes/enemies/basic_enemy.tscn" id="1_enemy"]
 [ext_resource type="PackedScene" path="res://src/scenes/player/basic_player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://src/scripts/test/test_game.gd" id="1_test"]
-[ext_resource type="PackedScene" path="res://src/scenes/ui/resource_counter.tscn" id="5_counter"]
 [ext_resource type="Script" path="res://src/scripts/managers/object_pool_manager.gd" id="2_pool"]
 [ext_resource type="Script" path="res://src/scripts/managers/enemy_spawn_manager.gd" id="3_spawn"]
+[ext_resource type="PackedScene" path="res://src/scenes/ui/resource_counter.tscn" id="5_counter"]
 [ext_resource type="PackedScene" path="res://src/scenes/ui/wave_indicator.tscn" id="6_wave"]
 
 [node name="TestGame" type="Node2D"]
