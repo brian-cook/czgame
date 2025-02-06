@@ -65,6 +65,18 @@
 - [x] Implement damage system
 - [x] Add basic knockback
 - [x] Create simple attack cooldown
+- [🟨] Implement player attack system
+    - [ ] Basic weapon system
+        - [ ] Projectile/melee detection
+        - [ ] Damage application
+        - [ ] Attack animations
+    - [ ] Weapon types
+        - [ ] Ranged weapon
+        - [ ] Melee weapon
+    - [ ] Attack feedback
+        - [ ] Hit effects
+        - [ ] Sound effects
+        - [ ] Screen effects
 - [🟨] Implement hit effects pool
     - [x] Basic effect system
     - [ ] Effect pooling
@@ -169,8 +181,10 @@
 - [x] Create basic_wave_manager.gd script
 - [x] Implement wave counter
 - [x] Setup enemy spawning
-- [~] Add wave completion detection
+- [🟨] Add wave completion detection
     - [x] Basic detection
+    - [ ] Enemy elimination tracking
+    - [ ] Wave clear conditions
     - [ ] Victory conditions
     - [ ] Wave transitions
 - [~] Create basic difficulty scaling
