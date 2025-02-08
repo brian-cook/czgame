@@ -30,7 +30,8 @@ const POOL_CONFIG = {
 		"batch_processing": true,
 		"batch_size": 10,
 		"memory_threshold": 0.8,
-		"inactive_timeout": 30.0
+		"inactive_timeout": 30.0,
+		"process_priority": 1  # Higher priority for projectiles
 	}
 }
 
@@ -622,3 +623,22 @@ func _get_trend_indicator(trend: float) -> String:
 		return "↗ (+%.1f%%)" % (trend * 100)
 	else:
 		return "↘ (%.1f%%)" % (trend * 100) 
+
+func _process_activation_queue() -> void:
+	var start_time = Time.get_ticks_usec()
+	var max_process_time = 2000  # 2ms max processing time
+	
+	while not _activation_queue.is_empty():
+		var item = _activation_queue[0]
+		
+		# Prioritize projectiles
+		if item.object.get_meta("pool_name") == "projectile":
+			_activate_object_internal(item.object, item.stats)
+			_activation_queue.pop_front()
+		else:
+			# Process other objects normally
+			_activate_object_internal(item.object, item.stats)
+			_activation_queue.pop_front()
+			
+		if (Time.get_ticks_usec() - start_time) > max_process_time:
+			break 

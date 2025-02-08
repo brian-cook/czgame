@@ -12,6 +12,10 @@ collision_mask = 8   # Layer 4 for enemies
 monitoring = true
 monitorable = true
 script = ExtResource("1_projectile")
+debug_draw = true  # Enable debug visualization
+
+# Add process priority for better performance
+process_priority = 1  # Higher priority for projectiles
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_1")
@@ -21,9 +25,6 @@ offset_left = -4.0
 offset_top = -4.0
 offset_right = 4.0
 offset_bottom = 4.0
-color = Color(1, 0.8, 0, 0.8)
+color = Color(1, 0.8, 0, 0.8)  # Slightly transparent yellow
 
-[node name="VisibleOnScreenNotifier2D" type="VisibleOnScreenNotifier2D" parent="."]
-scale = Vector2(0.4, 0.4)
-
-[connection signal="area_entered" from="." to="." method="_on_area_entered"][connection signal="screen_exited" from="VisibleOnScreenNotifier2D" to="." method="_on_screen_exited"]
+[connection signal="area_entered" from="." to="." method="_on_area_entered"]
