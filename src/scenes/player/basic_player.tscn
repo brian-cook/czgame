@@ -36,7 +36,7 @@ position = Vector2(0, 0)
 [node name="WeaponBase" type="Node2D" parent="WeaponMount"]
 position = Vector2(0, 0)
 script = ExtResource("6_weapon")
-fire_rate = 2.0
+fire_rate = 4.0
 damage = 10.0
 projectile_speed = 800.0
 
