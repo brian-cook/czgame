@@ -66,17 +66,48 @@
 - [x] Add basic knockback
 - [x] Create simple attack cooldown
 - [🟨] Implement player attack system
-    - [ ] Basic weapon system
-        - [ ] Projectile/melee detection
-        - [ ] Damage application
-        - [ ] Attack animations
-    - [ ] Weapon types
-        - [ ] Ranged weapon
-        - [ ] Melee weapon
-    - [ ] Attack feedback
-        - [ ] Hit effects
-        - [ ] Sound effects
-        - [ ] Screen effects
+    - [ ] Setup Infrastructure
+        - [ ] Create /src/scripts/weapons/ directory
+        - [ ] Create /src/scenes/weapons/ directory
+        - [ ] Create /src/scenes/projectiles/ directory
+        - [ ] Create weapon_base.gd
+        - [ ] Create projectile_base.gd
+    - [ ] Basic Projectile Implementation
+        - [ ] Create projectile scene
+            - [ ] Area2D root node
+            - [ ] CollisionShape2D (circle)
+            - [ ] Sprite/ColorRect
+            - [ ] Collision layers/masks
+        - [ ] Projectile script
+            - [ ] Movement properties
+            - [ ] Collision handling
+            - [ ] Lifetime management
+            - [ ] Cleanup handling
+    - [ ] Basic Weapon Implementation
+        - [ ] Create weapon scene
+            - [ ] Node2D root
+            - [ ] Visual indicator
+            - [ ] Projectile spawn point
+        - [ ] Weapon script
+            - [ ] Firing properties
+            - [ ] Input handling
+            - [ ] Projectile spawning
+            - [ ] Pool integration
+    - [ ] Player Integration
+        - [ ] Add weapon node to player
+        - [ ] Setup weapon component
+        - [ ] Configure input actions
+        - [ ] Player script integration
+    - [ ] Object Pool Setup
+        - [ ] Pool configuration
+        - [ ] Pool initialization
+        - [ ] Projectile recycling
+        - [ ] Performance monitoring
+    - [ ] Testing System
+        - [ ] Debug indicators
+        - [ ] Logging system
+        - [ ] Test scene
+        - [ ] Performance metrics
 - [🟨] Implement hit effects pool
     - [x] Basic effect system
     - [ ] Effect pooling
@@ -210,9 +241,9 @@
 Progress: ~75% complete (including partial implementations)
 
 ## Implementation Priority:
-1. Complete distance-based update optimization
-2. Implement damage number system
-3. Add combat feedback systems
+1. Complete basic weapon system
+2. Implement object pooling
+3. Add combat feedback
 4. Complete wave system UI
 5. Implement scene optimization
 6. Add sound effects system

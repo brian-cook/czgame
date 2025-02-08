@@ -181,11 +181,16 @@ func _setup_movement_actions() -> void:
 			InputMap.action_add_event(action_name, event)
 
 func _setup_combat_actions() -> void:
-	if not InputMap.has_action("attack"):
-		InputMap.add_action("attack")
-		var event_attack = InputEventMouseButton.new()
-		event_attack.button_index = MOUSE_BUTTON_LEFT
-		InputMap.action_add_event("attack", event_attack)
+	print("Setting up combat actions")
+	if InputMap.has_action("attack"):
+		InputMap.erase_action("attack")
+		
+	InputMap.add_action("attack")
+	var event_attack = InputEventMouseButton.new()
+	event_attack.button_index = MOUSE_BUTTON_LEFT
+	event_attack.pressed = true  # Important: specify that we want the pressed state
+	InputMap.action_add_event("attack", event_attack)
+	print("Attack action setup complete - Events:", InputMap.action_get_events("attack").size())
 
 func _setup_zone_actions() -> void:
 	if not InputMap.has_action("place_zone"):

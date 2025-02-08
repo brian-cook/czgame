@@ -5,8 +5,8 @@ extends CharacterBody2D
 signal health_changed(new_health: float, max_health: float)
 signal died
 signal took_damage(amount: float)
-signal attack_performed(position: Vector2)
 signal resource_collected(amount: float)
+signal weapon_fired(position: Vector2, direction: Vector2)
 
 # Export variables for easy tuning
 @export_group("Movement")
@@ -19,13 +19,16 @@ signal resource_collected(amount: float)
 @export var invincibility_time: float = 0.5
 @export var attack_cooldown: float = 0.5
 @export var attack_range: float = 50.0
+@export var fire_rate: float = 2.0  # Shots per second
+@export var projectile_damage: float = 10.0
+@export var projectile_speed: float = 800.0
 
 # Private variables
 var _current_health: float
 var _can_take_damage: bool = true
-var _can_attack: bool = true
 
 @onready var state_machine: PlayerStateMachine = $StateMachine
+@onready var weapon_base: WeaponBase = $WeaponMount/WeaponBase
 
 func _ready() -> void:
 	print("Player ready")
@@ -46,6 +49,13 @@ func _ready() -> void:
 
 	await get_tree().process_frame
 	_verify_input_actions()
+	
+	# Set up weapon reference
+	weapon_base = $WeaponMount/WeaponBase
+	if not weapon_base:
+		push_error("WeaponBase not found!")
+	else:
+		print("WeaponBase found and initialized")
 
 func _verify_input_actions() -> void:
 	var required_actions = ["move_up", "move_down", "move_left", "move_right"]
@@ -92,23 +102,15 @@ func die() -> void:
 	$ResourceCollector.set_collision_layer_value(1, false)
 	$ResourceCollector.set_collision_mask_value(1, false)
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("attack") and _can_attack:
-		_perform_attack()
-
-func _perform_attack() -> void:
-	_can_attack = false
-	
-	# Get attack direction (towards mouse)
-	var attack_direction = (get_global_mouse_position() - global_position).normalized()
-	var attack_position = global_position + (attack_direction * attack_range)
-	
-	attack_performed.emit(attack_position)
-	
-	# Start attack cooldown
-	get_tree().create_timer(attack_cooldown).timeout.connect(
-		func(): _can_attack = true
-	)
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			print("Left click detected")
+			if weapon_base:
+				print("Calling weapon try_fire")
+				weapon_base.try_fire()
+			else:
+				push_error("Weapon base not found!")
 
 func _on_resource_collector_area_entered(area: Area2D) -> void:
 	print("Player detected area: ", area.name)
@@ -128,3 +130,6 @@ func _on_resource_collector_area_entered(area: Area2D) -> void:
 func _on_resource_collected(value: float) -> void:
 	print("Player collected resource: ", value)
 	resource_collected.emit(value)
+
+func _on_weapon_fired(_weapon: Node2D, firing_position: Vector2) -> void:
+	weapon_fired.emit(firing_position, (get_global_mouse_position() - firing_position).normalized())

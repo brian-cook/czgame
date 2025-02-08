@@ -18,6 +18,19 @@ const POOL_CONFIG = {
 		"batch_size": 5,          # Number of objects to process per frame
 		"memory_threshold": 0.8,   # Trigger cleanup at 80% memory usage
 		"inactive_timeout": 60.0   # Seconds before inactive objects are cleaned up
+	},
+	"projectile": {
+		"scene": preload("res://src/scenes/projectiles/projectile.tscn"),
+		"initial_size": 50,
+		"growth_factor": 1.5,
+		"max_size": 200,
+		"cleanup_threshold": 0.5,
+		"performance_monitor": true,
+		"cleanup_interval": 30.0,
+		"batch_processing": true,
+		"batch_size": 10,
+		"memory_threshold": 0.8,
+		"inactive_timeout": 30.0
 	}
 }
 
@@ -120,9 +133,10 @@ func _create_pool(pool_name: String, scene: PackedScene, size: int) -> void:
 func _create_pooled_instance(scene: PackedScene, pool_name: String) -> Node:
 	var instance = scene.instantiate()
 	instance.process_mode = Node.PROCESS_MODE_DISABLED
-	instance.set_meta("pool_name", pool_name)  # Track which pool it belongs to
+	instance.set_meta("pool_name", pool_name)
 	add_child(instance)
 	instance.hide()
+	print("Created pooled instance for: ", pool_name)
 	return instance
 
 func get_object(pool_name: String) -> Node:
@@ -133,17 +147,20 @@ func get_object(pool_name: String) -> Node:
 	var pool = _pools[pool_name]
 	var stats = _pool_stats[pool_name]
 	
+	print("Looking for inactive object in pool:", pool_name)
 	# Try to find an inactive object
 	for obj in pool:
 		if obj.process_mode == Node.PROCESS_MODE_DISABLED:
+			print("Found inactive object in pool:", pool_name)
 			if POOL_CONFIG[pool_name].batch_processing:
 				_activation_queue.append({"object": obj, "stats": stats})
-				obj.process_mode = Node.PROCESS_MODE_INHERIT  # Immediately enable processing
+				obj.process_mode = Node.PROCESS_MODE_INHERIT
 				return obj
 			else:
 				_activate_object_internal(obj, stats)
 				return obj
 	
+	print("No inactive objects found in pool:", pool_name)
 	# If no inactive objects, try to expand pool
 	if stats.total < POOL_CONFIG[pool_name].max_size:
 		return _expand_pool(pool_name)
