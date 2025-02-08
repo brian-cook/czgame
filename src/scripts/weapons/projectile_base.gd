@@ -106,27 +106,27 @@ func _on_area_entered(area: Area2D) -> void:
     if not _initialized or not area or not area.owner:
         return
         
-    if area.owner != _source and area.owner.has_method("take_damage"):
-        if area.owner not in pierced_targets:
-            _handle_collision(area)
+    # Check if we hit an enemy's hurtbox
+    if area.get_parent() is BasicEnemy:
+        var enemy = area.get_parent() as BasicEnemy
+        if enemy != _source:  # Don't hit the source
+            _handle_collision(enemy)
+            print("Projectile hit enemy!")
 
-func _handle_collision(area: Area2D) -> void:
-    var target = area.owner
-    if target.has_method("take_damage"):
-        target.take_damage(damage, _direction)
-        hit_target.emit(target)
+func _handle_collision(enemy: BasicEnemy) -> void:
+    if enemy.has_method("take_damage"):
+        var knockback_direction = (enemy.global_position - global_position).normalized()
+        enemy.take_damage(damage, knockback_direction)
+        hit_target.emit(enemy)
         
-    pierced_targets.append(target)
-    if pierced_targets.size() >= pierce_count:
-        _handle_cleanup()
+        pierced_targets.append(enemy)
+        if pierced_targets.size() >= pierce_count:
+            _handle_cleanup()
 
 func _handle_cleanup(force: bool = false) -> void:
     if not _initialized or _cleanup_scheduled:
         return
         
-    var current_time = Time.get_ticks_msec() / 1000.0
-    var time_alive = current_time - _creation_time
-    
     # Only allow cleanup after minimum lifetime unless forced by lifetime expiry
     if force or time_alive >= MIN_LIFETIME:
         print("Cleaning up projectile - Force:", force, " Time alive:", time_alive)

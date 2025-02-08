@@ -153,13 +153,14 @@ func get_object(pool_name: String) -> Node:
 	for obj in pool:
 		if obj.process_mode == Node.PROCESS_MODE_DISABLED:
 			print("Found inactive object in pool:", pool_name)
-			if POOL_CONFIG[pool_name].batch_processing:
-				_activation_queue.append({"object": obj, "stats": stats})
-				obj.process_mode = Node.PROCESS_MODE_INHERIT
-				return obj
-			else:
-				_activate_object_internal(obj, stats)
-				return obj
+			
+			# Update stats before activating
+			stats.active += 1
+			stats.peak_usage = max(stats.peak_usage, stats.active)
+			
+			obj.process_mode = Node.PROCESS_MODE_INHERIT
+			_activate_object_internal(obj, stats)
+			return obj
 	
 	print("No inactive objects found in pool:", pool_name)
 	# If no inactive objects, try to expand pool
@@ -208,11 +209,25 @@ func return_object(obj: Node, pool_name: String) -> void:
 		push_error("Invalid object return to pool: " + pool_name)
 		return
 	
-	if POOL_CONFIG[pool_name].batch_processing:
-		_deactivation_queue.append({"object": obj, "pool_name": pool_name})
-		obj.process_mode = Node.PROCESS_MODE_DISABLED  # Immediately disable processing
+	var stats = _pool_stats[pool_name]
+	
+	# Update stats first
+	stats.active = max(0, stats.active - 1)
+	
+	# Use call_deferred to avoid physics callback issues
+	if obj is CollisionObject2D:
+		obj.call_deferred("set_process_mode", Node.PROCESS_MODE_DISABLED)
+		obj.call_deferred("hide")
 	else:
-		_deactivate_object_internal(obj, pool_name)
+		obj.process_mode = Node.PROCESS_MODE_DISABLED
+		obj.hide()
+	
+	# Reset object state
+	if obj.has_method("reset"):
+		obj.call_deferred("reset")
+	
+	# Sync stats after object return
+	call_deferred("_sync_pool_stats", pool_name)
 
 func _deactivate_object_internal(obj: Node, pool_name: String) -> void:
 	var stats = _pool_stats[pool_name]
@@ -642,3 +657,44 @@ func _process_activation_queue() -> void:
 			
 		if (Time.get_ticks_usec() - start_time) > max_process_time:
 			break 
+
+# Add this function to help debug pool stats
+func _debug_pool_stats(pool_name: String) -> void:
+	var stats = _pool_stats[pool_name]
+	var active_count = 0
+	var pool = _pools[pool_name]
+	
+	# Count actual active objects
+	for obj in pool:
+		if obj.process_mode == Node.PROCESS_MODE_INHERIT:
+			active_count += 1
+	
+	print("Pool Stats for %s:" % pool_name)
+	print("- Recorded active: ", stats.active)
+	print("- Actual active: ", active_count)
+	print("- Total: ", stats.total)
+	
+	# Auto-correct if needed
+	if active_count != stats.active:
+		print("Correcting active count from %d to %d" % [stats.active, active_count])
+		stats.active = active_count 
+
+# Add this function to sync pool stats
+func _sync_pool_stats(pool_name: String) -> void:
+	if not _pools.has(pool_name):
+		return
+		
+	var stats = _pool_stats[pool_name]
+	var pool = _pools[pool_name]
+	var active_count = 0
+	
+	# Count actual active objects
+	for obj in pool:
+		if obj.process_mode == Node.PROCESS_MODE_INHERIT:
+			active_count += 1
+	
+	# Update stats if they don't match
+	if stats.active != active_count:
+		print("Syncing %s pool stats - Active: %d -> %d" % [pool_name, stats.active, active_count])
+		stats.active = active_count
+		stats.peak_usage = max(stats.peak_usage, active_count)

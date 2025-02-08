@@ -54,9 +54,18 @@ func die() -> void:
 	print("Enemy died")
 	enemy_died.emit()
 	
-	# Return to pool instead of queue_free
+	# Use call_deferred for all physics-related cleanup
+	call_deferred("_handle_death")
+
+func _handle_death() -> void:
+	# These will be handled by the object pool manager
 	process_mode = Node.PROCESS_MODE_DISABLED
 	hide()
+	
+	# Disable collision shapes
+	for child in get_children():
+		if child is CollisionShape2D or child is CollisionPolygon2D:
+			child.call_deferred("set_disabled", true)
 
 func attack() -> void:
 	if _target and _target.has_method("take_damage"):
@@ -106,11 +115,21 @@ func reset() -> void:
 	# Clear target reference
 	_target = null
 	
-	# Disconnect all signals
-	var connections = enemy_died.get_connections()
-	for conn in connections:
-		enemy_died.disconnect(conn.callable)
+	# Disconnect all signals safely
+	for connection in enemy_died.get_connections():
+		enemy_died.disconnect(connection.callable)
+	for connection in health_changed.get_connections():
+		health_changed.disconnect(connection.callable)
 	
-	connections = health_changed.get_connections()
-	for conn in connections:
-		health_changed.disconnect(conn.callable)
+	# Reset collision state
+	process_mode = Node.PROCESS_MODE_DISABLED
+	hide()
+
+func _on_hurtbox_area_entered(area: Area2D) -> void:
+	# Cast the area to ProjectileBase first
+	var projectile := area as ProjectileBase
+	if projectile:  # Check if cast was successful
+		if projectile._source != self:  # Use _source instead of source
+			var knockback_direction = (global_position - projectile.global_position).normalized()
+			take_damage(projectile.damage, knockback_direction)
+			print("Enemy hit by projectile! Damage: ", projectile.damage)

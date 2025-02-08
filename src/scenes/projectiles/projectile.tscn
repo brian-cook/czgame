@@ -8,7 +8,7 @@ radius = 4.0
 [node name="Projectile" type="Area2D"]
 z_index = 1
 collision_layer = 4  # Layer 3 for projectiles
-collision_mask = 8   # Layer 4 for enemies
+collision_mask = 8   # Layer 4 for enemies (updated)
 monitoring = true
 monitorable = true
 script = ExtResource("1_projectile")
