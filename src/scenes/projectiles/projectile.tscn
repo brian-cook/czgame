@@ -6,16 +6,12 @@
 radius = 4.0
 
 [node name="Projectile" type="Area2D"]
-z_index = 1  # Add this to ensure projectiles render above other elements
+z_index = 1
 collision_layer = 4  # Layer 3 for projectiles
 collision_mask = 8   # Layer 4 for enemies
 monitoring = true
 monitorable = true
 script = ExtResource("1_projectile")
-debug_draw = true  # Enable debug visualization
-
-# Add process priority for better performance
-process_priority = 1  # Higher priority for projectiles
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_1")
@@ -25,6 +21,6 @@ offset_left = -4.0
 offset_top = -4.0
 offset_right = 4.0
 offset_bottom = 4.0
-color = Color(1, 0.8, 0, 0.8)  # Slightly transparent yellow
+color = Color(1, 0.8, 0, 0.8)
 
 [connection signal="area_entered" from="." to="." method="_on_area_entered"]

@@ -31,8 +31,10 @@ script = ExtResource("4_move")
 script = ExtResource("5_hurt")
 
 [node name="WeaponMount" type="Node2D" parent="."]
+position = Vector2(0, 0)
 
 [node name="WeaponBase" type="Node2D" parent="WeaponMount"]
+position = Vector2(0, 0)
 script = ExtResource("6_weapon")
 fire_rate = 2.0
 damage = 10.0

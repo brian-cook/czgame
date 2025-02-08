@@ -36,7 +36,8 @@ func try_fire() -> void:
     
     # Get firing direction (towards mouse)
     var mouse_pos = get_global_mouse_position()
-    var direction = (mouse_pos - global_position).normalized()
+    var spawn_pos = global_position  # Use weapon's actual global position
+    var direction = (mouse_pos - spawn_pos).normalized()
     
     var owner_name = "none"
     if owner:
@@ -44,14 +45,14 @@ func try_fire() -> void:
     
     print("Firing weapon:",
           "\n - mouse_pos:", mouse_pos,
-          "\n - weapon_pos:", global_position,
+          "\n - weapon_pos:", spawn_pos,
           "\n - direction:", direction,
           "\n - owner:", owner_name)
     
-    _spawn_projectile(direction)
-    weapon_fired.emit(self, global_position)
+    _spawn_projectile(spawn_pos, direction)
+    weapon_fired.emit(self, spawn_pos)
 
-func _spawn_projectile(direction: Vector2) -> void:
+func _spawn_projectile(spawn_pos: Vector2, direction: Vector2) -> void:
     var pool_manager = get_tree().get_first_node_in_group("pool_manager")
     if not pool_manager:
         push_error("Pool manager not found!")
@@ -65,7 +66,7 @@ func _spawn_projectile(direction: Vector2) -> void:
         
     print("Got projectile from pool - Valid:", is_instance_valid(projectile))
     projectile.initialize(
-        global_position,
+        spawn_pos,  # Use the provided spawn position
         direction,
         owner,  # The player
         damage,

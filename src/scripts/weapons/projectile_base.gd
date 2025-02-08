@@ -7,7 +7,6 @@ signal hit_target(target: Node)
 @export_group("Projectile Properties")
 @export var lifetime: float = 2.0
 @export var pierce_count: int = 1
-@export var debug_draw: bool = false  # Toggle debug visualization
 
 var speed: float = 800.0
 var damage: float = 10.0
@@ -34,7 +33,6 @@ func _ready() -> void:
     set_physics_process(false)
     process_mode = Node.PROCESS_MODE_DISABLED
     hide()
-    queue_redraw()  # For debug visualization
 
 func initialize(pos: Vector2, dir: Vector2, src: Node2D, dmg: float, spd: float) -> void:
     print("Projectile initialized at: ", pos, " with direction: ", dir)
@@ -61,57 +59,6 @@ func initialize(pos: Vector2, dir: Vector2, src: Node2D, dmg: float, spd: float)
     show()
     set_physics_process(true)
     process_mode = Node.PROCESS_MODE_INHERIT
-    queue_redraw()
-
-func _draw() -> void:
-    if not debug_draw:
-        return
-        
-    if _initialized:
-        # Draw predicted path with fading effect and distance markers
-        var line_length = speed * lifetime
-        var segments = 20
-        var segment_length = line_length / segments
-        
-        # Draw main trajectory line
-        draw_line(Vector2.ZERO, _direction * line_length, Color(1, 1, 0, 0.3), 1.0)
-        
-        # Draw segments with markers
-        var marker_distance = 200.0
-        var current_distance = 0.0
-        while current_distance < line_length:
-            var pos = _direction * current_distance
-            # Draw marker
-            var marker_size = 3.0
-            draw_arc(pos, marker_size, 0, TAU, 8, Color(1, 1, 0, 0.8))
-            
-            # Draw distance label
-            if current_distance > 0:  # Don't draw 0
-                var distance_text = str(int(current_distance))
-                var offset = Vector2(5, -5)  # Offset text slightly
-                draw_string(ThemeDB.fallback_font, pos + offset, distance_text, 
-                          HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 0, 0.8))
-            
-            current_distance += marker_distance
-        
-        # Draw current velocity vector
-        var velocity_length = speed * 0.05  # Shorter for clarity
-        draw_line(Vector2.ZERO, _direction * velocity_length, Color(0, 1, 0, 0.8), 2.0)
-        
-        # Draw projectile hitbox
-        var radius = 4.0
-        draw_arc(Vector2.ZERO, radius, 0, TAU, 16, Color(1, 0, 0, 0.8), 2.0)
-        
-        # Draw cleanup info
-        if time_alive >= MIN_LIFETIME:
-            var cleanup_text = "Cleanup in: %.1fs" % (lifetime - time_alive)
-            draw_string(ThemeDB.fallback_font, Vector2(0, -15), cleanup_text,
-                      HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color(1, 0, 0, 0.8))
-
-func _on_lifetime_expired() -> void:
-    if _initialized and not _cleanup_scheduled:
-        print("Lifetime expired for projectile at: ", global_position)
-        _handle_cleanup(true)
 
 func _physics_process(delta: float) -> void:
     if not _initialized or _cleanup_scheduled:
@@ -124,9 +71,6 @@ func _physics_process(delta: float) -> void:
     # Move projectile
     var movement = _direction * speed * delta
     global_position += movement
-    
-    if debug_draw:
-        queue_redraw()
     
     # Cache camera reference
     var camera = get_viewport().get_camera_2d()
@@ -152,6 +96,11 @@ func _physics_process(delta: float) -> void:
                   "\n - Distance traveled: ", distance,
                   "\n - Screen position: ", screen_pos)
             _handle_cleanup(false)
+
+func _on_lifetime_expired() -> void:
+    if _initialized and not _cleanup_scheduled:
+        print("Lifetime expired for projectile at: ", global_position)
+        _handle_cleanup(true)
 
 func _on_area_entered(area: Area2D) -> void:
     if not _initialized or not area or not area.owner:
