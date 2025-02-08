@@ -26,6 +26,9 @@ signal weapon_fired(position: Vector2, direction: Vector2)
 # Private variables
 var _current_health: float
 var _can_take_damage: bool = true
+var _using_controller: bool = false
+var _aim_direction: Vector2 = Vector2.RIGHT
+const CONTROLLER_DEADZONE: float = 0.2
 
 @onready var state_machine: PlayerStateMachine = $StateMachine
 @onready var weapon_base: WeaponBase = $WeaponMount/WeaponBase
@@ -102,15 +105,54 @@ func die() -> void:
 	$ResourceCollector.set_collision_layer_value(1, false)
 	$ResourceCollector.set_collision_mask_value(1, false)
 
+func _physics_process(delta: float) -> void:
+	# Get movement input
+	var input_vector = Input.get_vector(
+		"move_left", "move_right",
+		"move_up", "move_down"
+	)
+	
+	# Handle movement
+	if input_vector != Vector2.ZERO:
+		velocity = velocity.move_toward(
+			input_vector * speed,
+			acceleration * delta
+		)
+	else:
+		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
+	
+	move_and_slide()
+	
+	# Handle aiming
+	_update_aim_direction()
+
+func _update_aim_direction() -> void:
+	if weapon_base:
+		# Get right stick input
+		var aim_vector = Vector2(
+			Input.get_joy_axis(0, JOY_AXIS_RIGHT_X),
+			Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)
+		)
+		
+		# Check if using controller based on right stick movement
+		if aim_vector.length() > CONTROLLER_DEADZONE:
+			_using_controller = true
+			_aim_direction = aim_vector.normalized()
+			weapon_base.rotation = _aim_direction.angle()
+		else:
+			# Check if mouse has moved
+			var mouse_pos = get_global_mouse_position()
+			var to_mouse = mouse_pos - global_position
+			if to_mouse.length() > 0:
+				_using_controller = false
+				weapon_base.look_at(mouse_pos)
+
 func _input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			print("Left click detected")
-			if weapon_base:
-				print("Calling weapon try_fire")
-				weapon_base.try_fire()
-			else:
-				push_error("Weapon base not found!")
+	# Update controller state based on input type
+	if event is InputEventJoypadMotion or event is InputEventJoypadButton:
+		_using_controller = true
+	elif event is InputEventMouse:
+		_using_controller = false
 
 func _on_resource_collector_area_entered(area: Area2D) -> void:
 	print("Player detected area: ", area.name)
