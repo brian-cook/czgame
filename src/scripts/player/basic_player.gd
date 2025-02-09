@@ -162,8 +162,8 @@ func _on_resource_collector_area_entered(area: Area2D) -> void:
 	var script_path = area.get_script().get_path() if area.get_script() else ""
 	if script_path.ends_with("resource_pickup.gd"):
 		print("Starting resource collection")
-		# Connect signal first
-		if area.has_signal("collected"):
+		# Only connect if not already connected
+		if not area.is_connected("collected", _on_resource_collected):
 			area.collected.connect(_on_resource_collected)
 		area.start_collection(self)
 	else:

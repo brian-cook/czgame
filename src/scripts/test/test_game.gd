@@ -312,3 +312,20 @@ func _on_wave_started(wave_number: int) -> void:
 func _on_wave_completed(wave_number: int) -> void:
 	print("Wave ", wave_number, " completed!")
 	# TODO: Update UI
+
+# Current Control Scheme:
+#
+# Keyboard/Mouse:
+# - Movement: WASD or Arrow Keys
+# - Aim: Mouse position
+# - Attack: Left Mouse Button
+# - Place Zone: Spacebar
+#
+# Controller:
+# - Movement: Left Stick
+# - Aim: Right Stick
+# - Attack: R1/RB (Right Shoulder)
+# - Place Zone: A/Cross button
+#
+# Note: The game automatically switches between keyboard/mouse and controller
+# based on the last input type used.
