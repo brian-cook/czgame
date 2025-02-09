@@ -1,10 +1,11 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://src/scripts/player/basic_player.gd" id="1_player"]
 [ext_resource type="Script" path="res://src/scripts/player/player_state_machine.gd" id="2_state_machine"]
 [ext_resource type="Script" path="res://src/scripts/player/states/player_idle_state.gd" id="3_idle"]
 [ext_resource type="Script" path="res://src/scripts/player/states/player_move_state.gd" id="4_move"]
 [ext_resource type="Script" path="res://src/scripts/player/states/player_hurt_state.gd" id="5_hurt"]
+[ext_resource type="Script" path="res://src/scripts/weapons/weapon_base.gd" id="6_weapon"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_1"]
 radius = 16.0
@@ -28,6 +29,16 @@ script = ExtResource("4_move")
 
 [node name="Hurt" type="Node" parent="StateMachine"]
 script = ExtResource("5_hurt")
+
+[node name="WeaponMount" type="Node2D" parent="."]
+position = Vector2(0, 0)
+
+[node name="WeaponBase" type="Node2D" parent="WeaponMount"]
+position = Vector2(0, 0)
+script = ExtResource("6_weapon")
+fire_rate = 4.0
+damage = 10.0
+projectile_speed = 800.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_1")

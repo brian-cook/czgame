@@ -156,6 +156,7 @@ func _setup_input_actions() -> void:
 	_setup_movement_actions()
 	_setup_combat_actions()
 	_setup_zone_actions()
+	_setup_controller_detection()
 
 func _setup_movement_actions() -> void:
 	print("Setting up movement actions")
@@ -167,32 +168,114 @@ func _setup_movement_actions() -> void:
 	}
 	
 	for action_name in movement_actions:
-		# Remove existing action if it exists
 		if InputMap.has_action(action_name):
 			InputMap.erase_action(action_name)
-		
+			
 		print("Adding input action: ", action_name)
 		InputMap.add_action(action_name)
 		
+		# Add keyboard inputs
 		for key in movement_actions[action_name]:
 			var event = InputEventKey.new()
 			event.keycode = key
-			print("Adding key ", key, " to action ", action_name)
 			InputMap.action_add_event(action_name, event)
+		
+		# Add controller inputs
+		if action_name == "move_up":
+			var joy_event = InputEventJoypadMotion.new()
+			joy_event.axis = JOY_AXIS_LEFT_Y
+			joy_event.axis_value = -1.0
+			InputMap.action_add_event(action_name, joy_event)
+		elif action_name == "move_down":
+			var joy_event = InputEventJoypadMotion.new()
+			joy_event.axis = JOY_AXIS_LEFT_Y
+			joy_event.axis_value = 1.0
+			InputMap.action_add_event(action_name, joy_event)
+		elif action_name == "move_left":
+			var joy_event = InputEventJoypadMotion.new()
+			joy_event.axis = JOY_AXIS_LEFT_X
+			joy_event.axis_value = -1.0
+			InputMap.action_add_event(action_name, joy_event)
+		elif action_name == "move_right":
+			var joy_event = InputEventJoypadMotion.new()
+			joy_event.axis = JOY_AXIS_LEFT_X
+			joy_event.axis_value = 1.0
+			InputMap.action_add_event(action_name, joy_event)
 
 func _setup_combat_actions() -> void:
-	if not InputMap.has_action("attack"):
-		InputMap.add_action("attack")
-		var event_attack = InputEventMouseButton.new()
-		event_attack.button_index = MOUSE_BUTTON_LEFT
-		InputMap.action_add_event("attack", event_attack)
+	print("Setting up combat actions")
+	if InputMap.has_action("attack"):
+		InputMap.erase_action("attack")
+		
+	InputMap.add_action("attack")
+	
+	# Mouse input
+	var mouse_attack = InputEventMouseButton.new()
+	mouse_attack.button_index = MOUSE_BUTTON_LEFT
+	InputMap.action_add_event("attack", mouse_attack)
+	
+	# Controller input
+	var joy_attack = InputEventJoypadButton.new()
+	joy_attack.button_index = JOY_BUTTON_RIGHT_SHOULDER  # R1/RB button
+	InputMap.action_add_event("attack", joy_attack)
+	
+	# Add aim actions for controller
+	_setup_aim_actions()
+	
+	print("Attack action setup complete - Events:", InputMap.action_get_events("attack").size())
+
+func _setup_aim_actions() -> void:
+	# Setup right stick aim actions
+	var aim_actions = {
+		"aim_left": JOY_AXIS_RIGHT_X,
+		"aim_right": JOY_AXIS_RIGHT_X,
+		"aim_up": JOY_AXIS_RIGHT_Y,
+		"aim_down": JOY_AXIS_RIGHT_Y
+	}
+	
+	for action_name in aim_actions:
+		if InputMap.has_action(action_name):
+			InputMap.erase_action(action_name)
+			
+		InputMap.add_action(action_name)
+		
+		var joy_event = InputEventJoypadMotion.new()
+		joy_event.axis = aim_actions[action_name]
+		
+		# Set appropriate axis value
+		if action_name.ends_with("left") or action_name.ends_with("up"):
+			joy_event.axis_value = -1.0
+		else:
+			joy_event.axis_value = 1.0
+			
+		InputMap.action_add_event(action_name, joy_event)
 
 func _setup_zone_actions() -> void:
 	if not InputMap.has_action("place_zone"):
 		InputMap.add_action("place_zone")
+		
+		# Keyboard input
 		var event = InputEventKey.new()
 		event.keycode = KEY_SPACE
 		InputMap.action_add_event("place_zone", event)
+		
+		# Controller input - Use JoyButton enum
+		var joy_event = InputEventJoypadButton.new()
+		joy_event.button_index = JOY_BUTTON_A  # A/Cross button
+		InputMap.action_add_event("place_zone", joy_event)
+
+func _setup_controller_detection() -> void:
+	Input.joy_connection_changed.connect(_on_joy_connection_changed)
+	# Check for already connected controllers
+	for device_id in Input.get_connected_joypads():
+		_on_joy_connection_changed(device_id, true)
+
+func _on_joy_connection_changed(device: int, connected: bool) -> void:
+	if connected:
+		print("Controller connected: ", Input.get_joy_name(device))
+		# You could store the controller info or update UI here
+	else:
+		print("Controller disconnected: ", device)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("place_zone"):
@@ -257,3 +340,20 @@ func _on_wave_started(wave_number: int) -> void:
 func _on_wave_completed(wave_number: int) -> void:
 	print("Wave ", wave_number, " completed!")
 	# TODO: Update UI
+
+# Current Control Scheme:
+#
+# Keyboard/Mouse:
+# - Movement: WASD or Arrow Keys
+# - Aim: Mouse position
+# - Attack: Left Mouse Button
+# - Place Zone: Spacebar
+#
+# Controller:
+# - Movement: Left Stick
+# - Aim: Right Stick
+# - Attack: R1/RB (Right Shoulder)
+# - Place Zone: A/Cross button
+#
+# Note: The game automatically switches between keyboard/mouse and controller
+# based on the last input type used.
