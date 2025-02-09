@@ -25,25 +25,41 @@ func _ready() -> void:
     add_to_group("weapons")
 
 func _physics_process(_delta: float) -> void:
-    if can_fire:
-        # Auto-fire when using controller and holding R2
-        if owner._using_controller and Input.is_action_pressed("attack"):
-            try_fire()
-
-func try_fire() -> void:
     if not can_fire:
         return
         
+    # Handle both mouse click and controller input
+    if Input.is_action_pressed("attack"):
+        try_fire()
+
+func try_fire() -> void:
+    if not can_fire:
+        print("Weapon cannot fire - cooldown active")
+        return
+        
+    print("Attempting to fire weapon")
     can_fire = false
     _fire_timer.start(1.0 / fire_rate)
     
     var spawn_pos = global_position
     var direction: Vector2
     
-    if owner._using_controller:
-        direction = owner._aim_direction
-    else:
+    # Get aim direction based on input type
+    if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
         direction = (get_global_mouse_position() - spawn_pos).normalized()
+        print("Using mouse aim direction:", direction)
+    else:
+        # Use controller aim direction if available
+        var stick_x = Input.get_axis("aim_left", "aim_right")
+        var stick_y = Input.get_axis("aim_up", "aim_down")
+        var stick_input = Vector2(stick_x, stick_y)
+        
+        if stick_input.length() > 0.1:
+            direction = stick_input.normalized()
+            print("Using controller aim direction:", direction)
+        else:
+            direction = Vector2.RIGHT
+            print("Using default aim direction")
     
     _spawn_projectile(spawn_pos, direction)
     weapon_fired.emit(self, spawn_pos)

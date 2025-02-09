@@ -210,17 +210,45 @@ func _setup_combat_actions() -> void:
 	InputMap.add_action("attack")
 	
 	# Mouse input
-	var event_attack = InputEventMouseButton.new()
-	event_attack.button_index = MOUSE_BUTTON_LEFT
-	event_attack.pressed = true
-	InputMap.action_add_event("attack", event_attack)
+	var mouse_attack = InputEventMouseButton.new()
+	mouse_attack.button_index = MOUSE_BUTTON_LEFT
+	InputMap.action_add_event("attack", mouse_attack)
 	
-	# Controller input - Use JoyButton enum
+	# Controller input
 	var joy_attack = InputEventJoypadButton.new()
 	joy_attack.button_index = JOY_BUTTON_RIGHT_SHOULDER  # R1/RB button
 	InputMap.action_add_event("attack", joy_attack)
 	
+	# Add aim actions for controller
+	_setup_aim_actions()
+	
 	print("Attack action setup complete - Events:", InputMap.action_get_events("attack").size())
+
+func _setup_aim_actions() -> void:
+	# Setup right stick aim actions
+	var aim_actions = {
+		"aim_left": JOY_AXIS_RIGHT_X,
+		"aim_right": JOY_AXIS_RIGHT_X,
+		"aim_up": JOY_AXIS_RIGHT_Y,
+		"aim_down": JOY_AXIS_RIGHT_Y
+	}
+	
+	for action_name in aim_actions:
+		if InputMap.has_action(action_name):
+			InputMap.erase_action(action_name)
+			
+		InputMap.add_action(action_name)
+		
+		var joy_event = InputEventJoypadMotion.new()
+		joy_event.axis = aim_actions[action_name]
+		
+		# Set appropriate axis value
+		if action_name.ends_with("left") or action_name.ends_with("up"):
+			joy_event.axis_value = -1.0
+		else:
+			joy_event.axis_value = 1.0
+			
+		InputMap.action_add_event(action_name, joy_event)
 
 func _setup_zone_actions() -> void:
 	if not InputMap.has_action("place_zone"):
