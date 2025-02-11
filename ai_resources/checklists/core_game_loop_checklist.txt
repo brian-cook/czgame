@@ -110,14 +110,62 @@
         - [x] Performance metrics
 - [🟨] Implement hit effects pool
     - [x] Basic effect system
-    - [ ] Effect pooling
-        - [ ] Pool creation
-        - [ ] Effect reuse
-        - [ ] Memory management
-    - [ ] Performance optimization
-        - [ ] Batch processing
-        - [ ] Distance culling
-        - [ ] Effect limits
+    - [ ] Core Infrastructure
+        - [ ] Create /src/scenes/effects/ directory
+        - [ ] Create /src/scripts/effects/ directory
+        - [ ] Create /src/resources/effects/ directory
+        - [ ] Setup base_effect.tscn scene
+            - [ ] Node2D root
+            - [ ] Sprite2D/GPUParticles2D
+            - [ ] AnimationPlayer
+        - [ ] Create effect_manager.gd singleton
+        - [ ] Setup effect_config.gd resource
+    - [ ] Effect Pooling System
+        - [ ] Create effect_pool.gd
+        - [ ] Setup pool configuration
+            - [ ] Initial pool size
+            - [ ] Growth parameters
+            - [ ] Maximum limits
+        - [ ] Implement pool manager
+            - [ ] Effect spawning
+            - [ ] Effect recycling
+            - [ ] Memory cleanup
+    - [ ] Basic Effect Types
+        - [ ] Hit Flash Effect
+            - [ ] Sprite-based flash
+            - [ ] Color configuration
+            - [ ] Duration control
+        - [ ] Impact Particles
+            - [ ] Particle configuration
+            - [ ] Direction handling
+            - [ ] Lifetime management
+        - [ ] Hit Animation
+            - [ ] Scale animation
+            - [ ] Fade control
+            - [ ] Rotation effects
+    - [ ] Performance Optimization
+        - [ ] Implement effect culling
+            - [ ] Distance-based culling
+            - [ ] Off-screen optimization
+            - [ ] Effect priority system
+        - [ ] Batch Processing
+            - [ ] Group similar effects
+            - [ ] Update optimization
+            - [ ] Draw call reduction
+        - [ ] Memory Management
+            - [ ] Resource caching
+            - [ ] Pool size monitoring
+            - [ ] Cleanup triggers
+    - [ ] Integration Points
+        - [ ] Projectile collision
+        - [ ] Enemy damage
+        - [ ] Player hurt state
+        - [ ] Scene transitions
+    - [ ] Debug Tools
+        - [ ] Effect count display
+        - [ ] Performance metrics
+        - [ ] Visual debugging
+        - [ ] Pool statistics
 - [🟨] Add combat feedback systems
     - [x] Basic visual feedback
     - [ ] Sound effects
@@ -241,11 +289,12 @@
 Progress: ~90% complete (including partial implementations)
 
 ## Implementation Priority:
-1. Complete hit effects system
-2. Add sound effects
-3. Implement damage numbers
-4. Complete wave system
-5. Add high score system
+1. Setup core infrastructure
+2. Implement basic hit flash
+3. Add effect pooling
+4. Integrate with combat system
+5. Add performance optimization
+6. Implement advanced effects
 
 Note: [~] indicates partially implemented features
 [x] indicates completed features
