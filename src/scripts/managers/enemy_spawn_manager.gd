@@ -28,6 +28,8 @@ var _stagger_timer: Timer
 var _total_enemies: int = 0
 var _active_enemies: Array[BasicEnemy] = []
 
+@onready var global_event_bus = get_node("/root/GlobalEventBus")
+
 func initialize(object_pool: ObjectPoolManager, player: Node2D, wave_indicator: WaveIndicator = null) -> void:
 	_object_pool = object_pool
 	_player = player
@@ -67,6 +69,7 @@ func start_next_wave() -> void:
 		func():
 			_spawn_wave(enemies_to_spawn)
 			wave_started.emit(_current_wave)
+			global_event_bus.emit_wave_started(_current_wave)
 			if _wave_indicator:
 				_wave_indicator.show_wave_start(_current_wave)
 	, CONNECT_ONE_SHOT)
@@ -148,6 +151,7 @@ func _on_enemy_died(enemy: Node) -> void:
 		print("Wave complete! Starting next wave after delay...")
 		_wave_in_progress = false
 		wave_completed.emit(_current_wave)
+		global_event_bus.emit_wave_completed(_current_wave)
 		if _wave_indicator:
 			_wave_indicator.hide_progress()
 			_wave_indicator.show_wave_complete(_current_wave)

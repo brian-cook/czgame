@@ -1,5 +1,5 @@
-class_name EnemyAttackState
-extends EnemyState
+class_name BaseEnemyAttackState
+extends BaseEnemyState
 
 var _attack_cooldown: float = 1.0
 var _timer: float = 0.0
@@ -32,7 +32,7 @@ func enter() -> void:
 func physics_update(delta: float) -> void:
 	var target = enemy.get_target()
 	if not target:
-		enemy.state_machine.transition_to("Chase")
+		state_machine.transition_to("Chase")
 		return
 		
 	_timer += delta
@@ -57,7 +57,7 @@ func physics_update(delta: float) -> void:
 			_velocity_cache = direction * enemy.speed
 		
 		if _distance_squared > _attack_range_buffer_squared:
-			enemy.state_machine.transition_to("Chase")
+			state_machine.transition_to("Chase")
 			return
 	
 	# Use cached velocity for movement

@@ -1,7 +1,8 @@
-class_name PlayerState
+class_name BasePlayerState
 extends Node
 
 var player: BasicPlayer
+@onready var global_state = get_node("/root/GlobalPlayerState")
 
 func enter() -> void:
 	pass

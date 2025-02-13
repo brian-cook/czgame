@@ -17,6 +17,8 @@ var _velocity: Vector2 = Vector2.ZERO
 var _value_multiplier: float = 1.0
 var _is_being_collected: bool = false
 
+@onready var global_event_bus = get_node("/root/GlobalEventBus")
+
 func _ready() -> void:
 	print("Resource pickup ready at: ", global_position)
 	_current_value = base_value
@@ -56,8 +58,7 @@ func start_collection(collector: Node2D) -> void:
 
 func _collect() -> void:
 	if is_instance_valid(self):
-		print("Resource collected with value: ", _current_value)
-		collected.emit(_current_value)
+		global_event_bus.emit_resource_collected(_current_value)
 		queue_free()
 
 func set_value_multiplier(multiplier: float) -> void:

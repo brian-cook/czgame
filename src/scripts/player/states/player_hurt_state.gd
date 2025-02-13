@@ -1,5 +1,5 @@
 class_name PlayerHurtState
-extends PlayerState
+extends BasePlayerState
 
 var _knockback_velocity: Vector2
 var _stun_time: float = 0.2

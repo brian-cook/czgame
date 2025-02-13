@@ -70,6 +70,9 @@ var _last_process_time: float = 0.0
 var _frame_counter: int = 0
 const FRAMES_BETWEEN_UPDATES = 30  # Update stats every 30 frames
 
+@onready var global_game_manager = get_node("/root/GlobalGameManager")
+@onready var global_event_bus = get_node("/root/GlobalEventBus")
+
 func _ready() -> void:
 	add_to_group("pool_manager")
 	_initialize_pools()

@@ -30,8 +30,9 @@ var _using_controller: bool = false
 var _aim_direction: Vector2 = Vector2.RIGHT
 const CONTROLLER_DEADZONE: float = 0.2
 
-@onready var state_machine: PlayerStateMachine = $StateMachine
+@onready var state_machine: BasePlayerStateMachine = $StateMachine
 @onready var weapon_base: WeaponBase = $WeaponMount/WeaponBase
+@onready var global_state = get_node("/root/GlobalPlayerState")
 
 func _ready() -> void:
 	print("Player ready")

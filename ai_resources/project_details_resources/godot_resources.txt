@@ -30,15 +30,39 @@
 
 ## 3. Useful Design Patterns
 ### Singleton (Autoload)
+- Prefix autoload singletons with "Global" to avoid naming conflicts
+- Use descriptive names that indicate global scope
+- Keep autoloads minimal and focused
 
-gdscript
-game_manager.gd
+```gdscript
+# Example: game_manager.gd
+class_name GameManagerSingleton  # Note: Class name differs from autoload name
 extends Node
+
+# Register as: GlobalGameManager="*res://src/autoload/game_manager.gd"
+
 var score: int = 0
 signal score_changed(new_score: int)
+
 func add_score(value: int) -> void:
-score += value
-score_changed.emit(score)
+    score += value
+    score_changed.emit(score)
+```
+
+### Common Autoload Naming Patterns
+- GlobalGameManager (not GameManager)
+- GlobalEventBus (not EventBus)
+- GlobalPlayerState (not PlayerState)
+- GlobalAudioManager (not AudioManager)
+- GlobalSceneManager (not SceneManager)
+
+### Autoload Best Practices
+1. Always prefix with "Global" to avoid class naming conflicts
+2. Use "*" prefix in project.godot paths
+3. Keep class names distinct from autoload names
+4. Document dependencies between autoloads
+5. Initialize in proper order using _ready()
+6. Clean up resources in _exit_tree()
 
 ### State Machine
 ```gdscript

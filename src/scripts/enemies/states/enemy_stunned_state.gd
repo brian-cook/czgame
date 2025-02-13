@@ -1,5 +1,5 @@
-class_name EnemyStunnedState
-extends EnemyState
+class_name BaseEnemyStunnedState
+extends BaseEnemyState
 
 var _stun_time: float = 0.2
 var _timer: float = 0.0
@@ -13,7 +13,7 @@ func physics_update(delta: float) -> void:
 	_timer += delta
 	
 	if _timer >= _stun_time:
-		enemy.state_machine.transition_to("Chase")
+		state_machine.transition_to("Chase")
 		return
 		
 	# Apply knockback and friction

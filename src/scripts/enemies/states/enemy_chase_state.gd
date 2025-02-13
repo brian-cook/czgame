@@ -1,5 +1,5 @@
-class_name EnemyChaseState
-extends EnemyState
+class_name BaseEnemyChaseState
+extends BaseEnemyState
 
 func physics_update(delta: float) -> void:
 	var target = enemy.get_target()
@@ -15,4 +15,4 @@ func physics_update(delta: float) -> void:
 	
 	# Check if close enough to attack
 	if enemy.global_position.distance_to(target.global_position) <= enemy.attack_range:
-		enemy.state_machine.transition_to("Attack") 
+		state_machine.transition_to("Attack") 

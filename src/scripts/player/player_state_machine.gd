@@ -1,9 +1,9 @@
-class_name PlayerStateMachine
+class_name BasePlayerStateMachine
 extends Node
 
 signal state_changed(state_name: String)
 
-var current_state: PlayerState
+var current_state: BasePlayerState
 var states: Dictionary = {}
 var debug_label: Label
 
@@ -23,8 +23,9 @@ func _ready() -> void:
 	add_child(bg)
 	add_child(debug_label)
 	
+	# Get states from autoload
 	for child in get_children():
-		if child is PlayerState:
+		if child is BasePlayerState:
 			states[child.name.to_lower()] = child
 			child.player = owner as BasicPlayer
 	

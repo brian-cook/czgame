@@ -1,5 +1,5 @@
-class_name PlayerMoveState
-extends PlayerState
+class_name BasePlayerMoveState
+extends BasePlayerState
 
 var _input_buffer_time: float = 0.1
 var _buffered_input: Vector2 = Vector2.ZERO
