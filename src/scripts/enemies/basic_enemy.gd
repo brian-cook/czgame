@@ -16,7 +16,8 @@ signal health_changed(new_health: float, max_health: float)
 @export var attack_cooldown: float = 1.0
 @export var knockback_force: float = 100.0
 
-@onready var state_machine: EnemyStateMachine = $StateMachine
+@onready var state_machine: BaseEnemyStateMachine = $StateMachine
+@onready var global_event_bus = get_node("/root/GlobalEventBus")
 
 var _current_health: float
 var _target: Node2D
@@ -53,6 +54,7 @@ func take_damage(amount: float, knockback_direction: Vector2 = Vector2.ZERO) -> 
 func die() -> void:
 	print("Enemy died")
 	enemy_died.emit()
+	global_event_bus.emit_enemy_died(self)
 	
 	# Use call_deferred for all physics-related cleanup
 	call_deferred("_handle_death")

@@ -1,9 +1,9 @@
-class_name EnemyStateMachine
+class_name BaseEnemyStateMachine
 extends Node
 
 signal state_changed(state_name: String)
 
-var current_state: EnemyState
+var current_state: BaseEnemyState
 var states: Dictionary = {}
 var debug_label: Label
 var _last_transition_time: float = 0.0
@@ -36,10 +36,12 @@ func _ready() -> void:
 	add_child(bg)
 	add_child(debug_label)
 	
+	# Initialize states
+	var parent_enemy = owner as BasicEnemy
 	for child in get_children():
-		if child is EnemyState:
+		if child is BaseEnemyState:
 			states[child.name.to_lower()] = child
-			child.enemy = owner as BasicEnemy
+			child.initialize(self, parent_enemy)
 	
 	if states.has("chase"):
 		transition_to("chase")

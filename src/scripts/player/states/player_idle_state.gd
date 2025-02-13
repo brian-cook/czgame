@@ -1,5 +1,5 @@
-class_name PlayerIdleState
-extends PlayerState
+class_name BasePlayerIdleState
+extends BasePlayerState
 
 func enter() -> void:
 	player.velocity = Vector2.ZERO

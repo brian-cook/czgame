@@ -1,0 +1,79 @@
+# Current Project Issues Checklist
+
+## 1. Autoload Configuration [🟥 CRITICAL]
+- [ ] Fix malformed autoload entry in project.godot:
+    Change from: "#Addautoloadshereifneeded[_global_script_class_icons]PlayerState"
+    To: "GlobalPlayerState="*res://src/scripts/player/states/player_state.gd""
+    Note: Renamed to avoid conflict with PlayerState class
+- [ ] Properly register state machine autoloads
+- [ ] Add missing EffectManager autoload
+- [ ] Review and clean up unused autoloads
+
+## 2. Scene References [🟨 IMPORTANT]
+- [ ] Add proper UIDs to scene references using Godot 4.3's built-in UUID system
+- [ ] Verify all scene paths are correct using absolute paths
+- [ ] Document scene dependencies in a dependency graph
+- [ ] Implement scene validation system using ResourceLoader
+
+## 3. Collision System [🟨 IMPORTANT]
+- [ ] Review and document collision layers using Godot 4.3's layer naming:
+    - Layer 1: Player (1)
+    - Layer 4: Projectile (4)
+    - Layer 8: Enemy (8)
+    - Layer 16: Resource (16)
+- [ ] Create collision matrix documentation
+- [ ] Implement consistent collision masks
+- [ ] Add collision debug visualization using Debug > Visible Collision Shapes
+
+## 4. State Machine Issues [🟨 IMPORTANT]
+- [ ] Fix potential race conditions in transitions using proper signal connections
+- [ ] Implement proper transition queueing with defer
+- [ ] Add state transition validation
+- [ ] Improve state machine debugging with Debug > Remote Scene Tree
+- [ ] Document state machine architecture
+
+## 5. Object Pool Management [🟨 IMPORTANT]
+- [ ] Review cleanup logic using queue_free()
+- [ ] Implement proper synchronization using SceneTree
+- [ ] Add pool statistics tracking
+- [ ] Implement memory usage monitoring using Performance singleton
+- [ ] Document pool configuration
+
+## 6. Missing Infrastructure [🟦 SETUP]
+- [ ] Create directory structure:
+    /src/
+      /scenes/
+        /effects/
+      /scripts/
+        /effects/
+      /resources/
+        /effects/
+- [ ] Setup base effect classes
+- [ ] Implement effect pooling system
+
+## 7. Debug Systems [🟦 SETUP]
+- [ ] Add visual debugging tools using CanvasLayer
+- [ ] Implement logging system with print_debug()
+- [ ] Create performance monitoring using Performance singleton
+- [ ] Add state visualization
+- [ ] Setup debug console
+
+## Priority Levels:
+🟥 CRITICAL: Blocking issues that need immediate attention
+🟨 IMPORTANT: Should be fixed before new feature implementation
+🟦 SETUP: Required for proper project structure
+⬜ MINOR: Quality of life improvements
+
+## Notes:
+- Issues marked CRITICAL should be addressed before implementing new features
+- IMPORTANT issues may impact stability and performance
+- SETUP issues are required for proper project organization
+- Document all changes in the project changelog
+- All implementations should follow Godot 4.3 best practices
+
+## Next Steps:
+1. Fix autoload configuration in Project Settings
+2. Setup proper directory structure following /src organization
+3. Implement collision system documentation with proper layer setup
+4. Review and fix state machine issues using proper signal connections
+5. Improve object pool management with Performance monitoring

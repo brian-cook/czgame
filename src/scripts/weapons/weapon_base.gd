@@ -11,6 +11,8 @@ signal weapon_fired(weapon: Node2D, position: Vector2)
 var can_fire: bool = true
 var _fire_timer: Timer
 
+@onready var global_event_bus = get_node("/root/GlobalEventBus")
+
 func _ready() -> void:
     print("Weapon base initializing")
     # Setup fire rate timer
@@ -62,7 +64,7 @@ func try_fire() -> void:
             print("Using default aim direction")
     
     _spawn_projectile(spawn_pos, direction)
-    weapon_fired.emit(self, spawn_pos)
+    global_event_bus.emit_weapon_fired(self, spawn_pos)
 
 func _spawn_projectile(spawn_pos: Vector2, direction: Vector2) -> void:
     var pool_manager = get_tree().get_first_node_in_group("pool_manager")
